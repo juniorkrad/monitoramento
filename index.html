@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOME - Painel de Monitoramento</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="home-page">
+
+    <div class="page-container">
+        <header class="header">
+            <div class="logo-title-group">
+                <img src="banner2.png" alt="Logo da Empresa">
+                <h1>Painel de Monitoramento</h1>
+            </div>
+            <nav class="header-nav">
+                <a href="overview.html" class="nav-button">Visão Geral</a>
+            </nav>
+        </header>
+
+        <main class="main-content">
+            <div id="main-menu-screen" class="screen active">
+                <div id="main-menu-block">
+                    <a class="main-menu-button" data-target="nokia-screen">OLTs Nokia</a>
+                    <a class="main-menu-button" data-target="furukawa-lote15-screen">Furukawa Lote 15</a>
+                    <a class="main-menu-button" data-target="furukawa-sv-screen">Furukawa São Vicente</a>
+                </div>
+            </div>
+
+            <div id="nokia-screen" class="screen">
+                <div class="sub-menu-block">
+                    <a class="back-button">← Voltar ao Menu</a>
+                    <h3>OLTs Nokia</h3>
+                    <div class="menu-buttons">
+                        <a href="hel1.html" class="menu-button">HEL-1</a>
+                        <a href="hel2.html" class="menu-button">HEL-2</a>
+                        <a href="pqa1.html" class="menu-button">PQA-1</a>
+                        <a href="psv1.html" class="menu-button">PSV-1</a>
+                        <a href="mgp.html" class="menu-button">MGP</a>
+                    </div>
+                </div>
+            </div>
+
+            <div id="furukawa-lote15-screen" class="screen">
+                 <div class="sub-menu-block">
+                    <a class="back-button">← Voltar ao Menu</a>
+                    <h3>Furukawa Lote 15</h3>
+                    <div class="menu-buttons">
+                        <a href="ltxv1.html" class="menu-button">LTXV-1</a>
+                        <a href="ltxv2.html" class="menu-button">LTXV-2</a>
+                        <a href="pqa2.html" class="menu-button">PQA-2</a>
+                        <a href="pqa3.html" class="menu-button">PQA-3</a>
+                        <a href="sb1.html" class="menu-button">SB-1</a>
+                        <a href="sb2.html" class="menu-button">SB-2</a>
+                        <a href="sb3.html" class="menu-button">SB-3</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="furukawa-sv-screen" class="screen">
+                <div class="sub-menu-block">
+                    <a class="back-button">← Voltar ao Menu</a>
+                    <h3>Furukawa São Vicente</h3>
+                    <div class="menu-buttons">
+                        <a href="psv7.html" class="menu-button">PSV-7</a>
+                        <a href="sbo1.html" class="menu-button">SBO-1</a>
+                        <a href="sbo2.html" class="menu-button">SBO-2</a>
+                        <a href="sbo3.html" class="menu-button">SBO-3</a>
+                        <a href="sbo4.html" class="menu-button">SBO-4</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>© 2025 Painel de Monitoramento | Versão 1.0</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const mainMenuButtons = document.querySelectorAll('.main-menu-button');
+            const backButtons = document.querySelectorAll('.back-button');
+            const screens = document.querySelectorAll('.screen');
+
+            function switchScreen(targetId) {
+                screens.forEach(screen => screen.classList.remove('active'));
+                const targetScreen = document.getElementById(targetId);
+                if (targetScreen) {
+                    targetScreen.classList.add('active');
+                }
+            }
+
+            mainMenuButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault(); 
+                    switchScreen(button.dataset.target);
+                });
+            });
+
+            backButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    switchScreen('main-menu-screen');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEL-1</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="page-container">
+        <header class="header">
+            <div class="logo-title-group">
+                <img src="banner2.png" alt="Logo da Empresa">
+                <h1>HEL-1</h1>
+            </div>
+            <nav class="header-nav">
+                <span id="update-timestamp">Buscando dados...</span>
+                <a href="index.html" class="nav-button">Home</a>
+            </nav>
+        </header>
+
+        <div class="grid-container grid-4-cols">
+            </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
+        const SHEET_ID = '1BDx0zd0UGzOr2qqg1nftfe5WLUMh6MkcFO5psAG5GtU';
+        const RANGE = 'HEL1!A:E'; 
+        const API_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+        
+        // --- INÍCIO DA ALTERAÇÃO: CONFIGURAÇÃO DO AUTO-REFRESH ---
+        // Defina o intervalo de atualização em segundos (ex: 300 segundos = 5 minutos)
+        const REFRESH_INTERVAL_SECONDS = 300;
+        // --- FIM DA ALTERAÇÃO: CONFIGURAÇÃO DO AUTO-REFRESH ---
+
+        const container = document.querySelector('.grid-container');
+
+        // Função para criar a estrutura vazia das tabelas. Executa apenas uma vez.
+        function createTableStructure() {
+             for (let i = 1; i <= 8; i++) {
+                const placaId = i.toString().padStart(2, '0');
+                container.innerHTML += `<table><caption>PLACA ${placaId}</caption><thead><tr><th>Porta</th><th>UP</th><th>DOWN</th><th>Total</th><th>Status</th></tr></thead><tbody id="tbody-placa-${i}"></tbody></table>`;
+            }
+        }
+
+        // Função que busca os dados e preenche as tabelas. Será chamada repetidamente.
+        async function populateTables() {
+            // Limpa o conteúdo das tabelas antes de adicionar os dados atualizados
+            for (let i = 1; i <= 8; i++) {
+                const tbody = document.getElementById(`tbody-placa-${i}`);
+                if (tbody) {
+                    tbody.innerHTML = '';
+                }
+            }
+
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Erro ao buscar dados da API: ${errorData.error.message}`);
+                }
+                const data = await response.json();
+                // --- INÍCIO DA PARTE QUE ATUALIZA A DATA E HORA ---
+                const now = new Date();
+                // Formata a data e hora para o padrão brasileiro (dd/mm/aaaa, hh:mm:ss)
+                const timestampText = `Atualizado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
+                document.getElementById('update-timestamp').textContent = timestampText;
+                // --- FIM DA PARTE QUE ATUALIZA A DATA E HORA ---
+                const rows = data.values || []; 
+                const dataRows = rows.slice(1);
+                const portData = {};
+                dataRows.forEach(columns => {
+                    if (columns.length === 0) return;
+                    const pon = columns[0];
+                    const status = columns[4];
+                    if (!pon || !status) return;
+                    const ponParts = pon.split('/');
+                    if (ponParts.length < 4) return;
+                    const placa = ponParts[2];
+                    const porta = ponParts[3];
+                    const portKey = `${placa}/${porta}`;
+                    if (!portData[portKey]) {
+                        portData[portKey] = { up: 0, down: 0 };
+                    }
+                    if (status.trim().toLowerCase().includes('up')) {
+                        portData[portKey].up++;
+                    } else {
+                        portData[portKey].down++;
+                    }
+                });
+                for (const portKey in portData) {
+                    const [placa, porta] = portKey.split('/');
+                    const { up, down } = portData[portKey];
+                    const total = up + down;
+                    let statusClass = 'status-normal', statusText = 'NORMAL';
+                    if (total > 0 && (down / total === 1 || down / total === 0.5)) {
+                        statusClass = 'status-problema';
+                        statusText = 'PROBLEMA';
+                    } else if (down >= 16) {
+                        statusClass = 'status-atencao';
+                        statusText = 'ATENÇÃO';
+                    }
+                    const tableRowHTML = `<tr><td>PORTA ${porta.padStart(2, '0')}</td><td>${up}</td><td>${down}</td><td>${total}</td><td><span class="status ${statusClass}">${statusText}</span></td></tr>`;
+                    const targetTbody = document.getElementById(`tbody-placa-${placa}`);
+                    if (targetTbody) {
+                        targetTbody.innerHTML += tableRowHTML;
+                    }
+                }
+            } catch (error) {
+                console.error('Falha na operação:', error);
+                // O alert foi removido do refresh para não incomodar o usuário a cada falha
+                // Apenas o primeiro erro será notificado.
+                // alert(`Não foi possível carregar os dados da planilha. Erro: ${error.message}`);
+            }
+        }
+
+        // --- INÍCIO DA ALTERAÇÃO: LÓGICA DE EXECUÇÃO ---
+        document.addEventListener('DOMContentLoaded', () => {
+            createTableStructure(); // Cria a estrutura das tabelas uma vez
+            populateTables();       // Busca os dados pela primeira vez
+
+            // Configura o intervalo para atualizar os dados periodicamente
+            setInterval(populateTables, REFRESH_INTERVAL_SECONDS * 1000);
+        });
+        // --- FIM DA ALTERAÇÃO: LÓGICA DE EXECUÇÃO ---
+    </script>
+    <footer class="footer">
+        <p>© 2025 Painel de Monitoramento | Versão 1.0</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,145 @@
+/* ==========================================================================
+   Material Design 3 - CUSTOM DARK Theme (Base: #22003a, Accent: #67079f)
+   ========================================================================== */
+:root {
+    /* Cores Chave */
+    --m3-primary: #67079f; /* Roxo vibrante para ações principais */
+    --m3-primary-hover: #7b2cbf; /* Tom mais claro para hover */
+    --m3-on-primary: #FFFFFF;
+    --m3-surface: #22003a; /* Sua cor de fundo principal */
+    --m3-on-surface: #EADDFF;
+    --m3-on-surface-variant: #CAC4D0;
+    --m3-surface-container: #2f0e51; /* Cor para cards/tabelas */
+    --m3-surface-container-high: #3a1c63;
+    --m3-outline: #5c4e72;
+
+    /* Cores de Estado */
+    --m3-state-layer-hover: rgba(208, 188, 255, 0.12);
+
+    /* Cores de Status */
+    --m3-color-success: #67c23a;
+    --m3-color-warning: #e6a23c;
+    --m3-color-error: #f56c6c;
+    
+    /* Tipografia */
+    --font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+/* ==========================================================================
+   Estilos Base e Globais
+   ========================================================================== */
+html { 
+    height: 100%; 
+}
+body {
+    background-color: var(--m3-surface);
+    color: var(--m3-on-surface);
+    font-family: var(--font-family);
+    margin: 0;
+    padding: 15px 20px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+body.home-page {
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+.home-page .page-container, .home-page .main-content {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+}
+.home-page .main-content { overflow: hidden; }
+.page-container { max-width: 1880px; margin: 0 auto; width: 100%; }
+
+/* ==========================================================================
+   Componentes Globais (Header, Footer, Toast)
+   ========================================================================== */
+.header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid var(--m3-outline); margin-bottom: 15px; }
+.logo-title-group { display: flex; align-items: center; gap: 15px; }
+.logo-title-group img { width: 140px; height: auto; display: block; }
+.logo-title-group h1 { font-size: 1.7em; font-weight: 500; margin: 0; color: var(--m3-on-surface); }
+.header-nav { display: flex; align-items: center; gap: 20px; }
+#update-timestamp { font-size: 1.1em; color: var(--m3-on-surface-variant); }
+
+.footer { margin-top: 10px; padding: 8px 0; border-top: 1px solid var(--m3-outline); text-align: center; color: var(--m3-on-surface-variant); font-size: 0.9em; }
+
+#toast-container { /* ... (código do toast sem alteração) ... */ }
+.toast { /* ... */ } .toast.show { /* ... */ }
+.toast.problem { background-color: var(--m3-color-error); color: #fff; font-weight: 500; }
+
+/* ==========================================================================
+   Estilos da Página HOME (Menu Central)
+   ========================================================================== */
+.main-content { display: flex; position: relative; }
+.screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; opacity: 0; visibility: hidden; transition: opacity 0.4s ease, visibility 0.4s ease; }
+.screen.active { opacity: 1; visibility: visible; }
+
+#main-menu-block {
+    background-color: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(5px);
+    padding: 40px 60px;
+    border-radius: 16px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    border: 1px solid var(--m3-outline);
+}
+.main-menu-button {
+    background-color: var(--m3-primary);
+    color: var(--m3-on-primary);
+    padding: 18px 40px;
+    border-radius: 24px;
+    text-decoration: none;
+    font-size: 1.5em;
+    font-weight: 700;
+    transition: background-color 0.2s ease-in-out;
+    border: none;
+    cursor: pointer;
+    min-width: 450px;
+    text-align: center;
+}
+.main-menu-button:hover {
+    background-color: var(--m3-primary-hover); /* EFEITO DE HOVER CORRIGIDO */
+}
+
+/* Estilos dos Sub-Menus (que aparecem após o clique) */
+.sub-menu-block { background-color: var(--m3-surface-container); padding: 30px 40px; border-radius: 16px; border: 1px solid var(--m3-outline); width: 100%; max-width: 1000px; text-align: center; display: flex; flex-direction: column; }
+.back-button { align-self: flex-start; margin-bottom: 25px; background-color: transparent; color: var(--m3-primary); border: 1px solid var(--m3-primary); font-weight: 500; padding: 10px 20px; border-radius: 24px; text-decoration: none; cursor: pointer; transition: background-color 0.2s ease; }
+.back-button:hover { background-color: var(--m3-state-layer-hover); }
+.sub-menu-block h3 { font-size: 1.8em; font-weight: 500; margin: 0 0 25px 0; padding-bottom: 10px; border-bottom: 1px solid var(--m3-outline); color: var(--m3-on-surface); }
+.menu-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+.menu-button, .header-nav .nav-button {
+    background-color: var(--m3-surface-container-high);
+    color: var(--m3-on-surface);
+    padding: 12px 30px; border-radius: 24px; text-decoration: none;
+    font-weight: 500; transition: background-color 0.2s ease; border: none; cursor: pointer;
+}
+.menu-button:hover, .header-nav .nav-button:hover { background-color: var(--m3-state-layer-hover); }
+.header-nav .nav-button { font-size: 13.5px; padding: 9px 18px; }
+
+/* ==========================================================================
+   Estilos de Páginas de Dashboard (Grids) e Overview
+   ========================================================================== */
+.grid-container { display: grid; gap: 15px; padding-bottom: 20px; }
+.grid-4-cols { grid-template-columns: repeat(4, 1fr); }
+.grid-5-cols { grid-template-columns: repeat(5, 1fr); }
+.grid-2-cols { grid-template-columns: repeat(2, 1fr); }
+.overview-grid { grid-template-columns: repeat(4, 1fr); align-content: flex-start; }
+
+table, .overview-card { background-color: var(--m3-surface-container); border-radius: 12px; overflow: hidden; border: 1px solid var(--m3-outline); }
+/* ... (Resto do CSS para tabelas e cards, sem alterações) ... */
+
+/* ==========================================================================
+   Responsividade
+   ========================================================================== */
+@media (max-width: 1600px) { .grid-5-cols, .overview-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 1280px) { .grid-4-cols, .grid-5-cols, .overview-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) {
+    body { height: auto; }
+    .header { justify-content: center; flex-direction: column; gap: 20px; }
+    .logo-title-group h1 { font-size: 1.5em; }
+    .header-nav { flex-direction: column-reverse; }
+    .grid-container { grid-template-columns: repeat(1, 1fr); }
+    #main-menu-block { padding: 30px; min-width: auto; width: 100%; box-sizing: border-box; }
+    .main-menu-button { min-width: auto; }
+    .sub-menu-block { padding: 20px; }
+}
