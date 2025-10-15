@@ -89,15 +89,16 @@
                     const [placa, porta] = portKey.split('/');
                     const { up, down } = portData[portKey];
                     const total = up + down;
-                    let statusClass = 'status-normal', statusText = 'NORMAL';
+                    let statusClass = 'status-normal', statusText = 'Normal'; // Mudou para 'Normal'                    
                     if (total > 0 && (down / total === 1 || down / total === 0.5)) {
                         statusClass = 'status-problema';
-                        statusText = 'PROBLEMA';
+                        statusText = 'Problema'; // Mudou para 'Problema'
                     } else if (down >= 16) {
                         statusClass = 'status-atencao';
-                        statusText = 'ATENÇÃO';
-                    }
-                    const tableRowHTML = `<tr><td>PORTA ${porta.padStart(2, '0')}</td><td>${up}</td><td>${down}</td><td>${total}</td><td><span class="status ${statusClass}">${statusText}</span></td></tr>`;
+                        statusText = 'Atenção'; // Mudou para 'Atenção'
+                    }                 
+                    const tableRowHTML = `<tr><td>Porta ${porta.padStart(2, '0')}</td><td>${up}</td><td>${down}</td><td>${total}</td><td><span class="status ${statusClass}">${statusText}</span></td></tr>`;
+                    
                     const targetTbody = document.getElementById(`tbody-placa-${placa}`);
                     if (targetTbody) {
                         targetTbody.innerHTML += tableRowHTML;

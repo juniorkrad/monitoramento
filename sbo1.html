@@ -97,26 +97,26 @@
                     }
                 });
 
-                // ALTERAÇÃO: Nova lógica para popular as tabelas
                 for (const portKey in portData) {
                     const [placa, porta] = portKey.split('/');
                     const { active, inactive } = portData[portKey];
                     const total = active + inactive;
-                    
-                    // ALTERAÇÃO: Novas regras de status
-                    let statusClass = 'status-normal', statusText = 'NORMAL';
+                    let statusClass = 'status-normal', statusText = 'Normal'; // Mudou para 'Normal'
                     if (inactive > 16) {
                         statusClass = 'status-problema';
-                        statusText = 'PROBLEMA';
+                        statusText = 'Problema'; // Mudou para 'Problema'
                     } else if (inactive === 16) {
                          statusClass = 'status-atencao';
-                         statusText = 'ATENÇÃO';
-                    } else if (total > 0 && inactive / total >= 0.5) { // 50% ou mais (inclui 100%)
+                         statusText = 'Atenção'; // Mudou para 'Atenção'
+                    } else if (total > 0 && inactive / total >= 0.5) {
                         statusClass = 'status-problema';
-                        statusText = 'PROBLEMA';
+                        statusText = 'Problema';
                     }
                     
-                    const tableRowHTML = `<tr><td>PORTA ${porta.padStart(2, '0')}</td><td>${active}</td><td>${inactive}</td><td>${total}</td><td><span class="status ${statusClass}">${statusText}</span></td></tr>`;
+                    if (statusClass === 'status-problema') {
+                        newProblems.add(portKey);
+                    }
+                    const tableRowHTML = `<tr><td>Porta ${porta.padStart(2, '0')}</td><td>${active}</td><td>${inactive}</td><td>${total}</td><td><span class="status ${statusClass}">${statusText}</span></td></tr>`;
                     
                     const targetTbody = document.getElementById(`tbody-placa-${placa}`);
                     if (targetTbody) {
