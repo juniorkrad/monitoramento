@@ -1,13 +1,9 @@
 // ==============================================================================
-// layout.js - Construtor de Cabeçalho e Rodapé
+// layout.js - Construtor de Layout (Cabeçalho, Rodapé e Timestamp)
 // ==============================================================================
 
 /**
- * Constrói o cabeçalho da página com base nas configurações fornecidas.
- * @param {object} config - Objeto de configuração.
- * @param {string} config.title - O título a ser exibido no cabeçalho.
- * @param {string} config.buttonText - O texto do botão de navegação.
- * @param {string} config.buttonLink - O URL para onde o botão aponta.
+ * Constrói o cabeçalho da página.
  */
 function loadHeader(config) {
     const headerPlaceholder = document.getElementById('header-placeholder');
@@ -20,6 +16,7 @@ function loadHeader(config) {
                 <h1>${config.title}</h1>
             </div>
             <nav class="header-nav">
+                <span id="update-timestamp"></span>
                 <a href="${config.buttonLink}" class="nav-button">${config.buttonText}</a>
             </nav>
         </header>
@@ -27,18 +24,45 @@ function loadHeader(config) {
 }
 
 /**
- * Constrói o rodapé padrão para todas as páginas.
+ * Constrói o rodapé padrão.
  */
 function loadFooter() {
     const footerPlaceholder = document.getElementById('footer-placeholder');
     if (!footerPlaceholder) return;
-
-    // Usando o ano atual dinamicamente
     const currentYear = new Date().getFullYear();
-
     footerPlaceholder.innerHTML = `
         <footer class="footer">
             <p>© ${currentYear} Painel de Monitoramento | Desenvolvido por 👤@juniorkrad + 🤖Gemini</p>
         </footer>
     `;
+}
+
+/**
+ * Busca e exibe o timestamp da coleta de dados a partir da planilha.
+ * @param {string} sheetTab - O nome da aba da planilha (ex: 'HEL1', 'SBO1').
+ * @param {string} apiKey - A chave da API do Google.
+ * @param {string} sheetId - O ID da Planilha Google.
+ */
+async function loadTimestamp(sheetTab, apiKey, sheetId) {
+    const timestampEl = document.getElementById('update-timestamp');
+    if (!timestampEl) return;
+
+    timestampEl.textContent = 'Buscando data...';
+    const range = `${sheetTab}!K1`; // A célula onde o script Python salva a data
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Falha na busca do timestamp.');
+        
+        const data = await response.json();
+        if (data.values && data.values.length > 0 && data.values[0][0]) {
+            timestampEl.textContent = data.values[0][0]; // Exibe o texto da célula K1
+        } else {
+            timestampEl.textContent = 'Data não encontrada.';
+        }
+    } catch (error) {
+        timestampEl.textContent = 'Falha ao buscar data.';
+        console.error('Erro ao buscar timestamp:', error);
+    }
 }
