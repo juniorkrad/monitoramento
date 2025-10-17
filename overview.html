@@ -3,11 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visão Geral</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">    
+    <title>Visão Geral</title>    
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/png" href="favicon.png">
 </head>
@@ -15,16 +11,7 @@
     <div id="toast-container"></div>
 
     <div class="page-container">
-        <header class="header">
-            <div class="logo-title-group">
-                <img src="banner2.png" alt="Logo da Empresa">
-                <h1>Visão Geral</h1>
-            </div>
-            <nav class="header-nav">
-                <span id="update-timestamp">Buscando dados...</span>
-                <a href="index.html" class="nav-button">Home</a>
-            </nav>
-        </header>
+        <div id="header-placeholder"></div>
 
         <main class="main-content">
             <div id="overview-grid" class="grid-container overview-grid">
@@ -32,11 +19,11 @@
         </main>
     </div>
 
-    <footer class="footer">
-        <p>© 2025 Painel de Monitoramento | Versão 1.0</p>
-    </footer>
+    <div id="footer-placeholder"></div>
 
+    <script src="layout.js"></script>
     <script>
+        // --- INÍCIO DO SCRIPT PRINCIPAL DA PÁGINA ---
         const oltsConfig = [
             { id: 'HEL-1', sheetTab: 'HEL1', type: 'nokia' },
             { id: 'HEL-2', sheetTab: 'HEL2', type: 'nokia' },
@@ -155,17 +142,31 @@
 
         async function runOverview() {
             const now = new Date();
-            const timestampText = `Atualizado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
-            document.getElementById('update-timestamp').textContent = timestampText;
+            // A função agora verifica se o elemento do timestamp existe antes de tentar atualizá-lo
+            const timestampEl = document.getElementById('update-timestamp');
+            if (timestampEl) {
+                timestampEl.textContent = `Atualizado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
+            }
             createCardPlaceholders();
             const promises = oltsConfig.map(olt => fetchOltData(olt));
             await Promise.all(promises);
         }
         
+        // --- PONTO DE PARTIDA UNIFICADO E CORRIGIDO ---
         document.addEventListener('DOMContentLoaded', () => {
+            // 1. Carrega o layout primeiro
+            loadHeader({
+                title: "Visão Geral",
+                buttonText: "Home",
+                buttonLink: "index.html"
+            });
+            loadFooter();
+
+            // 2. Depois de o layout estar criado, inicia a busca de dados
             runOverview();
             setInterval(runOverview, REFRESH_INTERVAL_SECONDS * 1000);
         });
     </script>
+
 </body>
 </html>

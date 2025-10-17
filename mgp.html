@@ -4,30 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MGP</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/png" href="favicon.png">
 </head>
 <body>
 
     <div class="page-container">
-        <header class="header">
-            <div class="logo-title-group">
-                <img src="banner2.png" alt="Logo da Empresa">
-                <h1>MGP</h1>
-            </div>
-            <nav class="header-nav">
-                <span id="update-timestamp">Buscando dados...</span>
-                <a href="index.html" class="nav-button">Home</a>
-            </nav>
-        </header>
+        <div id="header-placeholder"></div>
 
         <div class="grid-container grid-4-cols">
             </div>
     </div>
+
+    <div id="footer-placeholder"></div>
 
     <script>
         const API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
@@ -117,9 +106,18 @@
         });
     </script>
     
-    <footer class="footer">
-        <p>© 2025 Painel de Monitoramento | Versão 1.0</p>
-    </footer>
+    <script src="layout.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Esta parte será customizada para cada página
+            loadHeader({
+                title: "Painel de Monitoramento", // Título da página
+                buttonText: "Home",       // Texto do botão
+                buttonLink: "index.html"      // Link do botão
+            });
+            loadFooter(); // Carrega o rodapé padrão
+        });
+    </script>   
 
 </body>
 </html>

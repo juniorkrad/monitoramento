@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SBO-2</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/png" href="favicon.png">
 </head>
@@ -16,24 +12,13 @@
     <div id="toast-container"></div>
 
     <div class="page-container">
-        <header class="header">
-            <div class="logo-title-group">
-                <img src="banner2.png" alt="Logo da Empresa">
-                <h1>SBO-2</h1>
-            </div>
-            <nav class="header-nav">
-                <span id="update-timestamp">Buscando dados...</span>
-                <a href="index.html" class="nav-button">Home</a>
-            </nav>
-        </header>
+        <div id="header-placeholder"></div>
 
         <div class="grid-container grid-2-cols">
             </div>
     </div>
 
-    <footer class="footer">
-        <p>© 2025 Painel de Monitoramento | Versão 1.0</p>
-    </footer>
+    <div id="footer-placeholder"></div>
 
     <script>
         const API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
@@ -162,6 +147,19 @@
             createTableStructure();
             populateTables();
             setInterval(populateTables, REFRESH_INTERVAL_SECONDS * 1000);
+        });
+    </script>
+
+    <script src="layout.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Esta parte será customizada para cada página
+            loadHeader({
+                title: "Painel de Monitoramento", // Título da página
+                buttonText: "Home",       // Texto do botão
+                buttonLink: "index.html"      // Link do botão
+            });
+            loadFooter(); // Carrega o rodapé padrão
         });
     </script>
     
