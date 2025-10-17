@@ -9,6 +9,8 @@
 </head>
 <body>
 
+    <div id="toast-container"></div>
+
     <div class="page-container">
         <div id="header-placeholder"></div>
 
@@ -23,15 +25,9 @@
         const SHEET_ID = '1BDx0zd0UGzOr2qqg1nftfe5WLUMh6MkcFO5psAG5GtU';
         const RANGE = 'HEL1!A:E'; 
         const API_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
-        
-        // --- INÍCIO DA ALTERAÇÃO: CONFIGURAÇÃO DO AUTO-REFRESH ---
-        // Defina o intervalo de atualização em segundos (ex: 300 segundos = 5 minutos)
         const REFRESH_INTERVAL_SECONDS = 300;
-        // --- FIM DA ALTERAÇÃO: CONFIGURAÇÃO DO AUTO-REFRESH ---
-
         const container = document.querySelector('.grid-container');
 
-        // Função para criar a estrutura vazia das tabelas. Executa apenas uma vez.
         function createTableStructure() {
              for (let i = 1; i <= 8; i++) {
                 const placaId = i.toString().padStart(2, '0');
@@ -39,16 +35,13 @@
             }
         }
 
-        // Função que busca os dados e preenche as tabelas. Será chamada repetidamente.
         async function populateTables() {
-            // Limpa o conteúdo das tabelas antes de adicionar os dados atualizados
             for (let i = 1; i <= 8; i++) {
                 const tbody = document.getElementById(`tbody-placa-${i}`);
                 if (tbody) {
                     tbody.innerHTML = '';
                 }
             }
-
             try {
                 const response = await fetch(API_URL);
                 if (!response.ok) {
@@ -56,15 +49,12 @@
                     throw new Error(`Erro ao buscar dados da API: ${errorData.error.message}`);
                 }
                 const data = await response.json();
-                // --- INÍCIO DA PARTE QUE ATUALIZA A DATA E HORA ---
-                const now = new Date();
-                // Formata a data e hora para o padrão brasileiro (dd/mm/aaaa, hh:mm:ss)
-                const timestampText = `Atualizado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
-                document.getElementById('update-timestamp').textContent = timestampText;
-                // --- FIM DA PARTE QUE ATUALIZA A DATA E HORA ---
+                
                 const rows = data.values || []; 
                 const dataRows = rows.slice(1);
                 const portData = {};
+                const newProblems = new Set(); // Cria a lista de problemas para esta verificação
+
                 dataRows.forEach(columns => {
                     if (columns.length === 0) return;
                     const pon = columns[0];
@@ -84,18 +74,25 @@
                         portData[portKey].down++;
                     }
                 });
+
                 for (const portKey in portData) {
                     const [placa, porta] = portKey.split('/');
                     const { up, down } = portData[portKey];
                     const total = up + down;
-                    let statusClass = 'status-normal', statusText = 'Normal'; // Mudou para 'Normal'                    
+                    let statusClass = 'status-normal', statusText = 'Normal';
                     if (total > 0 && (down / total === 1 || down / total === 0.5)) {
                         statusClass = 'status-problema';
-                        statusText = 'Problema'; // Mudou para 'Problema'
+                        statusText = 'Problema';
                     } else if (down >= 16) {
                         statusClass = 'status-atencao';
-                        statusText = 'Atenção'; // Mudou para 'Atenção'
-                    }                 
+                        statusText = 'Atenção';
+                    }
+                    
+                    // Adiciona a porta à lista de problemas, se for o caso
+                    if (statusClass === 'status-problema') {
+                        newProblems.add(portKey);
+                    }
+                    
                     const tableRowHTML = `<tr><td>Porta ${porta.padStart(2, '0')}</td><td>${up}</td><td>${down}</td><td>${total}</td><td><span class="status ${statusClass}">${statusText}</span></td></tr>`;
                     
                     const targetTbody = document.getElementById(`tbody-placa-${placa}`);
@@ -103,34 +100,31 @@
                         targetTbody.innerHTML += tableRowHTML;
                     }
                 }
+
+                // Chama a função centralizada do notifications.js para verificar e notificar
+                checkAndNotifyForNewProblems(newProblems);
+
             } catch (error) {
                 console.error('Falha na operação:', error);
-                // O alert foi removido do refresh para não incomodar o usuário a cada falha
-                // Apenas o primeiro erro será notificado.
-                // alert(`Não foi possível carregar os dados da planilha. Erro: ${error.message}`);
             }
         }
-
-        // --- INÍCIO DA ALTERAÇÃO: LÓGICA DE EXECUÇÃO ---
-        document.addEventListener('DOMContentLoaded', () => {
-            createTableStructure(); // Cria a estrutura das tabelas uma vez
-            populateTables();       // Busca os dados pela primeira vez
-
-            // Configura o intervalo para atualizar os dados periodicamente
-            setInterval(populateTables, REFRESH_INTERVAL_SECONDS * 1000);
-        });
-        // --- FIM DA ALTERAÇÃO: LÓGICA DE EXECUÇÃO ---
     </script>
+    
     <script src="layout.js"></script>
-    <script>
+    <script src="notifications.js"></script> <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Esta parte será customizada para cada página
+            // Carrega o layout
             loadHeader({
-                title: "Painel de Monitoramento", // Título da página
-                buttonText: "Home",       // Texto do botão
-                buttonLink: "index.html"      // Link do botão
+                title: "HEL-1",
+                buttonText: "Home",
+                buttonLink: "index.html"
             });
-            loadFooter(); // Carrega o rodapé padrão
+            loadFooter();
+            
+            // Inicia a busca de dados da página
+            createTableStructure();
+            populateTables();
+            setInterval(populateTables, REFRESH_INTERVAL_SECONDS * 1000);
         });
     </script>
 </body>

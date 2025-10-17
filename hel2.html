@@ -9,6 +9,8 @@
 </head>
 <body>
 
+    <div id="toast-container"></div>
+
     <div class="page-container">
         <div id="header-placeholder"></div>
 
@@ -21,7 +23,6 @@
     <script>
         const API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
         const SHEET_ID = '1BDx0zd0UGzOr2qqg1nftfe5WLUMh6MkcFO5psAG5GtU';
-        // PASSO 3: Altere o nome da ABA na planilha
         const RANGE = 'HEL2!A:E'; 
         
         const API_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
@@ -38,7 +39,9 @@
         async function populateTables() {
             for (let i = 1; i <= 8; i++) {
                 const tbody = document.getElementById(`tbody-placa-${i}`);
-                if (tbody) { tbody.innerHTML = ''; }
+                if (tbody) {
+                    tbody.innerHTML = '';
+                }
             }
             try {
                 const response = await fetch(API_URL);
@@ -47,15 +50,12 @@
                     throw new Error(`Erro ao buscar dados da API: ${errorData.error.message}`);
                 }
                 const data = await response.json();
-                // --- INÍCIO DA PARTE QUE ATUALIZA A DATA E HORA ---
-                const now = new Date();
-                // Formata a data e hora para o padrão brasileiro (dd/mm/aaaa, hh:mm:ss)
-                const timestampText = `Atualizado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
-                document.getElementById('update-timestamp').textContent = timestampText;
-                // --- FIM DA PARTE QUE ATUALIZA A DATA E HORA ---
+                
                 const rows = data.values || []; 
                 const dataRows = rows.slice(1);
                 const portData = {};
+                const newProblems = new Set(); // Cria a lista de problemas para esta verificação
+
                 dataRows.forEach(columns => {
                     if (columns.length === 0) return;
                     const pon = columns[0];
@@ -75,18 +75,25 @@
                         portData[portKey].down++;
                     }
                 });
+
                 for (const portKey in portData) {
                     const [placa, porta] = portKey.split('/');
                     const { up, down } = portData[portKey];
                     const total = up + down;
-                    let statusClass = 'status-normal', statusText = 'Normal'; // Mudou para 'Normal'                    
+                    let statusClass = 'status-normal', statusText = 'Normal';
                     if (total > 0 && (down / total === 1 || down / total === 0.5)) {
                         statusClass = 'status-problema';
-                        statusText = 'Problema'; // Mudou para 'Problema'
+                        statusText = 'Problema';
                     } else if (down >= 16) {
                         statusClass = 'status-atencao';
-                        statusText = 'Atenção'; // Mudou para 'Atenção'
-                    }                 
+                        statusText = 'Atenção';
+                    }
+                    
+                    // Adiciona a porta à lista de problemas, se for o caso
+                    if (statusClass === 'status-problema') {
+                        newProblems.add(portKey);
+                    }
+                    
                     const tableRowHTML = `<tr><td>Porta ${porta.padStart(2, '0')}</td><td>${up}</td><td>${down}</td><td>${total}</td><td><span class="status ${statusClass}">${statusText}</span></td></tr>`;
                     
                     const targetTbody = document.getElementById(`tbody-placa-${placa}`);
@@ -94,30 +101,32 @@
                         targetTbody.innerHTML += tableRowHTML;
                     }
                 }
+
+                // Chama a função centralizada do notifications.js para verificar e notificar
+                checkAndNotifyForNewProblems(newProblems);
+
             } catch (error) {
                 console.error('Falha na operação:', error);
             }
         }
-
+    </script>
+    
+    <script src="layout.js"></script>
+    <script src="notifications.js"></script> <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Carrega o layout
+            loadHeader({
+                title: "HEL-2",
+                buttonText: "Home",
+                buttonLink: "index.html"
+            });
+            loadFooter();
+            
+            // Inicia a busca de dados da página
             createTableStructure();
             populateTables();
             setInterval(populateTables, REFRESH_INTERVAL_SECONDS * 1000);
         });
     </script>
-
-    <script src="layout.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Esta parte será customizada para cada página
-            loadHeader({
-                title: "Painel de Monitoramento", // Título da página
-                buttonText: "Home",       // Texto do botão
-                buttonLink: "index.html"      // Link do botão
-            });
-            loadFooter(); // Carrega o rodapé padrão
-        });
-    </script>
-
 </body>
 </html>

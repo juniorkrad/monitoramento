@@ -29,20 +29,6 @@
         const REFRESH_INTERVAL_SECONDS = 300;
         const container = document.querySelector('.grid-container');
 
-        let currentProblems = new Set();
-        function showToast(message, type = '') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            container.appendChild(toast);
-            setTimeout(() => { toast.classList.add('show'); }, 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                toast.addEventListener('transitionend', () => toast.remove());
-            }, 5000);
-        }
-
         function createTableStructure() {
              for (let i = 1; i <= 2; i++) {
                 const placaId = i.toString().padStart(2, '0');
@@ -63,32 +49,22 @@
                 }
                 const data = await response.json();
                 
-                const now = new Date();
-                const timestampText = `Atualizado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
-                document.getElementById('update-timestamp').textContent = timestampText;
-
                 const rows = data.values || []; 
                 const dataRows = rows.slice(1);
                 const portData = {};
-                const newProblems = new Set();
+                const newProblems = new Set(); // Cria a lista de problemas para esta verificação
 
                 dataRows.forEach(columns => {
                     if (columns.length === 0) return;
-                    const oltPort = columns[0]; // ex: "GPON1/16" da coluna A
-                    const status = columns[2];  // ex: "Active" da coluna C
+                    const oltPort = columns[0];
+                    const status = columns[2]; 
                     if (!oltPort || !status) return;
 
-                    // --- INÍCIO DA CORREÇÃO ---
-                    // Usa uma expressão regular para extrair os números do formato "GPON<placa>/<porta>"
                     const match = oltPort.match(/GPON(\d+)\/(\d+)/);
-                    
-                    // Se o formato não corresponder, pula esta linha
                     if (!match) return;
 
-                    const placa = match[1]; // O primeiro número capturado (placa)
-                    const porta = match[2]; // O segundo número capturado (porta)
-                    // --- FIM DA CORREÇÃO ---
-                    
+                    const placa = match[1];
+                    const porta = match[2];
                     const portKey = `${placa}/${porta}`;
 
                     if (!portData[portKey]) {
@@ -106,13 +82,13 @@
                     const [placa, porta] = portKey.split('/');
                     const { active, inactive } = portData[portKey];
                     const total = active + inactive;
-                    let statusClass = 'status-normal', statusText = 'Normal'; // Mudou para 'Normal'
+                    let statusClass = 'status-normal', statusText = 'Normal';
                     if (inactive > 16) {
                         statusClass = 'status-problema';
-                        statusText = 'Problema'; // Mudou para 'Problema'
+                        statusText = 'Problema';
                     } else if (inactive === 16) {
-                         statusClass = 'status-atencao';
-                         statusText = 'Atenção'; // Mudou para 'Atenção'
+                        statusClass = 'status-atencao';
+                        statusText = 'Atenção';
                     } else if (total > 0 && inactive / total >= 0.5) {
                         statusClass = 'status-problema';
                         statusText = 'Problema';
@@ -121,6 +97,7 @@
                     if (statusClass === 'status-problema') {
                         newProblems.add(portKey);
                     }
+                    
                     const tableRowHTML = `<tr><td>Porta ${porta.padStart(2, '0')}</td><td>${active}</td><td>${inactive}</td><td>${total}</td><td><span class="status ${statusClass}">${statusText}</span></td></tr>`;
                     
                     const targetTbody = document.getElementById(`tbody-placa-${placa}`);
@@ -129,38 +106,32 @@
                     }
                 }
 
-                for (const problemKey of newProblems) {
-                    if (!currentProblems.has(problemKey)) {
-                        const [placa, porta] = problemKey.split('/');
-                        showToast(`Novo PROBLEMA detectado: PLACA ${placa.padStart(2, '0')} / PORTA ${porta.padStart(2, '0')}`, 'problem');
-                    }
-                }
-                currentProblems = newProblems;
+                // Chama a função centralizada do notifications.js
+                checkAndNotifyForNewProblems(newProblems);
 
             } catch (error) {
-                document.getElementById('update-timestamp').textContent = "Falha ao atualizar.";
                 console.error('Falha na operação:', error);
             }
         }
-
+    </script>
+    
+    <script src="layout.js"></script>
+    <script src="notifications.js"></script>
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Carrega o layout
+            loadHeader({
+                title: "PQA-3",
+                buttonText: "Home",
+                buttonLink: "index.html"
+            });
+            loadFooter();
+            
+            // Inicia a busca de dados da página
             createTableStructure();
             populateTables();
             setInterval(populateTables, REFRESH_INTERVAL_SECONDS * 1000);
         });
     </script>
-    <script src="layout.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Esta parte será customizada para cada página
-            loadHeader({
-                title: "Painel de Monitoramento", // Título da página
-                buttonText: "Home",       // Texto do botão
-                buttonLink: "index.html"      // Link do botão
-            });
-            loadFooter(); // Carrega o rodapé padrão
-        });
-    </script>
-    
 </body>
 </html>
