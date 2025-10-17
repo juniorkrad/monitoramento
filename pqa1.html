@@ -23,9 +23,12 @@
     <script>
         const API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
         const SHEET_ID = '1BDx0zd0UGzOr2qqg1nftfe5WLUMh6MkcFO5psAG5GtU';
-        const RANGE = 'PQA1!A:E';
         
-        const API_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+        const RANGE_DATA = 'PQA1!A:J';
+        const RANGE_TIMESTAMP = 'PQA1!K1';
+
+        const API_URL_DATA = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE_DATA}?key=${API_KEY}`;
+        
         const REFRESH_INTERVAL_SECONDS = 300;
         const container = document.querySelector('.grid-container');
 
@@ -44,10 +47,9 @@
                 }
             }
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(API_URL_DATA);
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(`Erro ao buscar dados da API: ${errorData.error.message}`);
+                    throw new Error('Falha ao buscar dados das portas.');
                 }
                 const data = await response.json();
                 
@@ -89,7 +91,6 @@
                         statusText = 'Atenção';
                     }
                     
-                    // Adiciona a porta à lista de problemas, se for o caso
                     if (statusClass === 'status-problema') {
                         newProblems.add(portKey);
                     }
@@ -102,19 +103,19 @@
                     }
                 }
 
-                // Chama a função centralizada do notifications.js para verificar e notificar
                 checkAndNotifyForNewProblems(newProblems);
 
             } catch (error) {
+                showToast("Falha ao atualizar dados das portas.", "problem");
                 console.error('Falha na operação:', error);
             }
         }
     </script>
     
     <script src="layout.js"></script>
-    <script src="notifications.js"></script> <script>
+    <script src="notifications.js"></script>
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Carrega o layout
             loadHeader({
                 title: "PQA-1",
                 buttonText: "Home",
@@ -122,10 +123,15 @@
             });
             loadFooter();
             
-            // Inicia a busca de dados da página
             createTableStructure();
-            populateTables();
-            setInterval(populateTables, REFRESH_INTERVAL_SECONDS * 1000);
+            
+            function refreshAllData() {
+                populateTables();
+                loadTimestamp('PQA1', API_KEY, SHEET_ID);
+            }
+            
+            refreshAllData();
+            setInterval(refreshAllData, REFRESH_INTERVAL_SECONDS * 1000);
         });
     </script>
 </body>
