@@ -111,9 +111,10 @@
     </script>
     
     <script src="layout.js"></script>
-    <script src="notifications.js"></script> <script>
+    <script src="notifications.js"></script>
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Carrega o layout
+            // 1. Carrega o layout
             loadHeader({
                 title: "HEL-1",
                 buttonText: "Home",
@@ -121,7 +122,7 @@
             });
             loadFooter();
             
-            // Inicia a busca de dados da página
+            // 2. Inicia a busca de dados da página
             createTableStructure();
             populateTables();
             setInterval(populateTables, REFRESH_INTERVAL_SECONDS * 1000);
