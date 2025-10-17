@@ -15,15 +15,6 @@
 
     <div class="page-container">
         <div id="header-placeholder"></div>
-        <!-- <header class="header">
-            <div class="logo-title-group">
-                <img src="banner2.png" alt="Logo da Empresa">
-                <h1>Painel de Monitoramento</h1>
-            </div>
-            <nav class="header-nav">
-                <a href="overview.html" class="nav-button">Visão Geral</a>
-            </nav>
-        </header> -->
 
         <main class="main-content">
             <div id="main-menu-screen" class="screen active">
@@ -80,10 +71,7 @@
         </main>
     </div>
 
-    <div id="footer-placeholder"></div>
-    <!-- <footer class="footer">
-        <p>© 2025 Painel de Monitoramento | Versão 1.0</p>
-    </footer> -->
+    <div id="footer-placeholder"></div>  
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -111,6 +99,18 @@
                     switchScreen('main-menu-screen');
                 });
             });
+        });
+    </script>
+    <script src="layout.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Esta parte será customizada para cada página
+            loadHeader({
+                title: "Painel de Monitoramento", // Título da página
+                buttonText: "Visão Geral",       // Texto do botão
+                buttonLink: "overview.html"      // Link do botão
+            });
+            loadFooter(); // Carrega o rodapé padrão
         });
     </script>
 </body>
