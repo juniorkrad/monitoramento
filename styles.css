@@ -70,16 +70,28 @@ body.home-page {
 .menu-button:hover, .header-nav .nav-button:hover { background-color: var(--m3-state-layer-hover); }
 .header-nav .nav-button { font-size: 13.5px; padding: 9px 18px; }
 
-.grid-container { display: grid; gap: 12px; padding-bottom: 20px; }
-.grid-4-cols { grid-template-columns: repeat(4, 1fr); }
-.grid-5-cols { grid-template-columns: repeat(5, 1fr); }
-.grid-2-cols { grid-template-columns: repeat(2, 1fr); }
-.overview-grid { grid-template-columns: repeat(5, 1fr); align-content: flex-start; }
+/* --- INÍCIO DA ATUALIZAÇÃO DO GRID --- */
+.grid-container {
+    display: grid;
+    gap: 20px; /* Espaçamento unificado */
+    padding-bottom: 20px;
+    /* A "Mágica" do grid responsivo: */
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-content: flex-start; /* Alinha os cards ao topo */
+    width: 100%; /* Garante que o grid ocupe o espaço disponível */
+}
+/* As classes .grid-4-cols, .grid-5-cols, .grid-2-cols, .overview-grid foram REMOVIDAS */
+/* --- FIM DA ATUALIZAÇÃO DO GRID --- */
 
 table { width: 100%; border-collapse: separate; border-spacing: 0; background-color: var(--m3-surface-container); border-radius: 12px; overflow: hidden; border: 1px solid var(--m3-outline); }
 caption { font-size: 1.2em; font-weight: 500; padding: 12px; text-align: left; color: var(--m3-on-surface); }
-th, td { padding: 8px 12px; text-align: left; border-top: 1px solid var(--m3-outline); color: var(--m3-on-surface); }
-.grid-5-cols th, .grid-5-cols td { padding: 8px 10px; }
+th, td { 
+    padding: 8px 10px; /* Padding unificado (baseado na antiga regra .grid-5-cols) */
+    text-align: left; 
+    border-top: 1px solid var(--m3-outline); 
+    color: var(--m3-on-surface); 
+}
+/* A regra .grid-5-cols th, .grid-5-cols td foi REMOVIDA */
 th { font-weight: 500; color: var(--m3-on-surface-variant); border-top: none; }
 tr:first-child td { border-top: none; }
 
@@ -115,16 +127,12 @@ tr:first-child td { border-top: none; }
 .donut-chart .donut-fg { stroke: var(--m3-color-success); stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
 .chart-text { position: absolute; font-size: 1.8em; font-weight: 700; color: var(--m3-on-surface); }
 
-/* --- SEÇÃO DE RESPONSIVIDADE CORRIGIDA --- */
-@media (max-width: 1600px) { .grid-5-cols, .overview-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 1400px) { .overview-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 1280px) { .grid-4-cols, .grid-5-cols, .overview-grid { grid-template-columns: repeat(2, 1fr); } }
+/* --- SEÇÃO DE RESPONSIVIDADE ATUALIZADA --- */
 @media (max-width: 768px) {
     body { height: auto; }
     .header { justify-content: center; flex-direction: column; gap: 20px; }
     .logo-title-group h1 { font-size: 1.5em; }
     .header-nav { flex-direction: column-reverse; }
-    .grid-container { grid-template-columns: repeat(1, 1fr); }
     #main-menu-block { padding: 30px; min-width: auto; width: 100%; box-sizing: border-box; }
     .main-menu-button { min-width: auto; }
     .sub-menu-block { padding: 20px; }
