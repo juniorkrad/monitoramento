@@ -28,6 +28,11 @@ body {
     padding: 15px 20px;
     font-size: 14px;
     box-sizing: border-box;
+
+    /* --- INÍCIO DA ADIÇÃO DA TRANSIÇÃO --- */
+    /* Aplica esta animação a CADA página que for carregada */
+    animation: fadeInPage 0.4s ease-in-out;
+    /* --- FIM DA ADIÇÃO DA TRANSIÇÃO --- */
 }
 body.home-page {
     height: 100vh; display: flex; flex-direction: column; overflow: hidden;
@@ -39,8 +44,7 @@ body.home-page {
 .page-container { max-width: 1880px; margin: 0 auto; width: 100%; }
 
 .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid var(--m3-outline); margin-bottom: 15px; }
-/* Esta regra foi removida pois .header já faz isso */
-/* .header.home-header { justify-content: space-between; } */
+.header.home-header { justify-content: space-between; }
 .logo-title-group { display: flex; align-items: center; gap: 15px; }
 .logo-title-group img { width: 140px; height: auto; display: block; }
 .logo-title-group h1 { font-size: 1.7em; font-weight: 500; margin: 0; color: var(--m3-on-surface); }
@@ -131,29 +135,36 @@ tr:first-child td { border-top: none; }
     color: var(--m3-on-surface); 
 }
 
-/* ==========================================================================
-   SEÇÃO DE RESPONSIVIDADE (AQUI ESTÁ A CORREÇÃO)
-   ========================================================================== */
+/* --- INÍCIO DA ADIÇÃO DA TRANSIÇÃO (Keyframes) --- */
+/* Define a animação de fade-in */
+@keyframes fadeInPage {
+    from {
+        opacity: 0;
+        transform: translateY(-10px); /* Efeito opcional de deslizar de cima */
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+/* --- FIM DA ADIÇÃO DA TRANSIÇÃO --- */
+
+/* SEÇÃO DE RESPONSIVIDADE (AQUI ESTÁ A CORREÇÃO) */
 @media (max-width: 768px) {
     body { height: auto; }
     
-    /* --- INÍCIO DAS REGRAS DO CABEÇALHO --- */
-    /* Faz o cabeçalho empilhar seus filhos (logo e nav) verticalmente */
     .header { 
         flex-direction: column; 
         justify-content: center; 
         gap: 20px; 
     }
-    /* Reduz o tamanho do título principal em celulares */
     .logo-title-group h1 { 
         font-size: 1.5em; 
     }
-    /* Faz a barra de navegação empilhar seus filhos (timestamp e botão) */
     .header-nav { 
         flex-direction: column-reverse; 
-        gap: 15px; /* Adiciona espaço entre o botão e o timestamp */
+        gap: 15px;
     }
-    /* --- FIM DAS REGRAS DO CABEÇALHO --- */
 
     #main-menu-block { padding: 30px; min-width: auto; width: 100%; box-sizing: border-box; }
     .main-menu-button { min-width: auto; }
