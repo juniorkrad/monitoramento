@@ -39,7 +39,8 @@ body.home-page {
 .page-container { max-width: 1880px; margin: 0 auto; width: 100%; }
 
 .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid var(--m3-outline); margin-bottom: 15px; }
-.header.home-header { justify-content: space-between; }
+/* Esta regra foi removida pois .header já faz isso */
+/* .header.home-header { justify-content: space-between; } */
 .logo-title-group { display: flex; align-items: center; gap: 15px; }
 .logo-title-group img { width: 140px; height: auto; display: block; }
 .logo-title-group h1 { font-size: 1.7em; font-weight: 500; margin: 0; color: var(--m3-on-surface); }
@@ -119,19 +120,42 @@ tr:first-child td { border-top: none; }
 .donut-chart { transform: rotate(-90deg); }
 .donut-chart circle { 
     fill: none; 
-    stroke-width: 10; /* ALTERAÇÃO AQUI: Reduzido de 12 para 10 */
+    stroke-width: 10;
 }
 .donut-chart .donut-bg { stroke: var(--m3-surface-container-high); }
 .donut-chart .donut-fg { stroke: var(--m3-color-success); stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
 .chart-text { 
     position: absolute; 
-    font-size: 1.6em; /* ALTERAÇÃO AQUI: Reduzido de 1.8em para 1.6em */
+    font-size: 1.6em;
     font-weight: 700; 
     color: var(--m3-on-surface); 
 }
 
-/* --- SEÇÃO DE RESPONSIVIDADE (SEM ALTERAÇÕES) --- */
-@media (max-width: 1600px) { /* ... */ }
-@media (max-width: 1400px) { /* ... */ }
-@media (max-width: 1280px) { /* ... */ }
-@media (max-width: 768px) { /* ... */ }
+/* ==========================================================================
+   SEÇÃO DE RESPONSIVIDADE (AQUI ESTÁ A CORREÇÃO)
+   ========================================================================== */
+@media (max-width: 768px) {
+    body { height: auto; }
+    
+    /* --- INÍCIO DAS REGRAS DO CABEÇALHO --- */
+    /* Faz o cabeçalho empilhar seus filhos (logo e nav) verticalmente */
+    .header { 
+        flex-direction: column; 
+        justify-content: center; 
+        gap: 20px; 
+    }
+    /* Reduz o tamanho do título principal em celulares */
+    .logo-title-group h1 { 
+        font-size: 1.5em; 
+    }
+    /* Faz a barra de navegação empilhar seus filhos (timestamp e botão) */
+    .header-nav { 
+        flex-direction: column-reverse; 
+        gap: 15px; /* Adiciona espaço entre o botão e o timestamp */
+    }
+    /* --- FIM DAS REGRAS DO CABEÇALHO --- */
+
+    #main-menu-block { padding: 30px; min-width: auto; width: 100%; box-sizing: border-box; }
+    .main-menu-button { min-width: auto; }
+    .sub-menu-block { padding: 20px; }
+}
