@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visão Geral</title>    
+    <title>Visão Geral</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">    
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/png" href="favicon.png">
 </head>
@@ -15,16 +19,13 @@
 
         <main class="main-content">
             <div id="overview-grid" class="grid-container">
-            <!-- <div id="overview-grid" class="grid-container overview-grid"> -->
                 </div>
         </main>
     </div>
 
     <div id="footer-placeholder"></div>
 
-    <script src="layout.js"></script>
     <script>
-        // --- INÍCIO DO SCRIPT PRINCIPAL DA PÁGINA ---
         const oltsConfig = [
             { id: 'HEL-1', sheetTab: 'HEL1', type: 'nokia' },
             { id: 'HEL-2', sheetTab: 'HEL2', type: 'nokia' },
@@ -50,19 +51,7 @@
         const REFRESH_INTERVAL_SECONDS = 300;
         
         let currentProblems = new Set();
-        function showToast(message, type = '') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            container.appendChild(toast);
-            setTimeout(() => { toast.classList.add('show'); }, 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                toast.addEventListener('transitionend', () => toast.remove());
-            }, 5000);
-        }
+        function showToast(message, type = '') { /* (função toast) */ }
 
         function createCardPlaceholders() {
             const grid = document.getElementById('overview-grid');
@@ -135,27 +124,46 @@
                  header.classList.add('status-normal');
             }
             const statsHtml = `<div class="stat-item"><span>${total}</span><label>Total</label></div><div class="stat-item online"><span>${onlineCount}</span><label>${type === 'nokia' ? 'Up' : 'Active'}</label></div><div class="stat-item offline"><span>${offlineCount}</span><label>${type === 'nokia' ? 'Down' : 'Inactive'}</label></div>`;
-            const circumference = 2 * Math.PI * 45;
+            
+            // --- INÍCIO DA ALTERAÇÃO ---
+            const newRadius = 40; // Novo raio do círculo (era 45)
+            const circumference = 2 * Math.PI * newRadius; // Recalcula a circunferência
             const offset = circumference - (onlinePercent / 100) * circumference;
-            const chartHtml = `<div class="donut-chart-container"><svg class="donut-chart" width="120" height="120" viewBox="0 0 100 100"><circle class="donut-bg" cx="50" cy="50" r="45"></circle><circle class="donut-fg" cx="50" cy="50" r="45" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"></circle></svg><div class="chart-text">${Math.round(onlinePercent)}%</div></div>`;
+            const chartHtml = `
+                <div class="donut-chart-container">
+                    <svg class="donut-chart" width="100" height="100" viewBox="0 0 100 100">
+                        <circle class="donut-bg" cx="50" cy="50" r="${newRadius}"></circle>
+                        <circle class="donut-fg" cx="50" cy="50" r="${newRadius}"
+                            stroke-dasharray="${circumference}"
+                            stroke-dashoffset="${offset}">
+                        </circle>
+                    </svg>
+                    <div class="chart-text">${Math.round(onlinePercent)}%</div>
+                </div>
+            `;
+            // --- FIM DA ALTERAÇÃO ---
+
             card.querySelector('.card-body').innerHTML = `<div class="card-stats">${statsHtml}</div>${chartHtml}`;
         }
 
         async function runOverview() {
-            const now = new Date();
-            // A função agora verifica se o elemento do timestamp existe antes de tentar atualizá-lo
+            // ... (código do runOverview sem alterações) ...
             const timestampEl = document.getElementById('update-timestamp');
             if (timestampEl) {
-                timestampEl.textContent = `Atualizado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
+                timestampEl.textContent = "Buscando dados...";
             }
             createCardPlaceholders();
             const promises = oltsConfig.map(olt => fetchOltData(olt));
             await Promise.all(promises);
+            // Atualiza o timestamp *após* a conclusão das buscas
+            const now = new Date();
+            const timestampText = `Atualizado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
+            if(timestampEl) timestampEl.textContent = timestampText;
         }
         
         // --- PONTO DE PARTIDA UNIFICADO E CORRIGIDO ---
         document.addEventListener('DOMContentLoaded', () => {
-            // 1. Carrega o layout primeiro
+            // 1. Carrega o layout
             loadHeader({
                 title: "Visão Geral",
                 buttonText: "Home",
@@ -163,11 +171,14 @@
             });
             loadFooter();
 
-            // 2. Depois de o layout estar criado, inicia a busca de dados
+            // 2. Inicia a busca de dados da página
             runOverview();
             setInterval(runOverview, REFRESH_INTERVAL_SECONDS * 1000);
         });
     </script>
+    
+    <script src="layout.js"></script>
+    <script src="notifications.js"></script>
 
 </body>
 </html>

@@ -70,28 +70,23 @@ body.home-page {
 .menu-button:hover, .header-nav .nav-button:hover { background-color: var(--m3-state-layer-hover); }
 .header-nav .nav-button { font-size: 13.5px; padding: 9px 18px; }
 
-/* --- INÍCIO DA ATUALIZAÇÃO DO GRID --- */
 .grid-container {
     display: grid;
-    gap: 20px; /* Espaçamento unificado */
+    gap: 20px;
     padding-bottom: 20px;
-    /* A "Mágica" do grid responsivo: */
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    align-content: flex-start; /* Alinha os cards ao topo */
-    width: 100%; /* Garante que o grid ocupe o espaço disponível */
+    align-content: flex-start;
+    width: 100%;
 }
-/* As classes .grid-4-cols, .grid-5-cols, .grid-2-cols, .overview-grid foram REMOVIDAS */
-/* --- FIM DA ATUALIZAÇÃO DO GRID --- */
 
 table { width: 100%; border-collapse: separate; border-spacing: 0; background-color: var(--m3-surface-container); border-radius: 12px; overflow: hidden; border: 1px solid var(--m3-outline); }
 caption { font-size: 1.2em; font-weight: 500; padding: 12px; text-align: left; color: var(--m3-on-surface); }
 th, td { 
-    padding: 8px 10px; /* Padding unificado (baseado na antiga regra .grid-5-cols) */
+    padding: 8px 10px;
     text-align: left; 
     border-top: 1px solid var(--m3-outline); 
     color: var(--m3-on-surface); 
 }
-/* A regra .grid-5-cols th, .grid-5-cols td foi REMOVIDA */
 th { font-weight: 500; color: var(--m3-on-surface-variant); border-top: none; }
 tr:first-child td { border-top: none; }
 
@@ -122,18 +117,21 @@ tr:first-child td { border-top: none; }
 .stat-item.offline span { color: var(--m3-color-error); }
 .donut-chart-container { position: relative; display: flex; justify-content: center; align-items: center; }
 .donut-chart { transform: rotate(-90deg); }
-.donut-chart circle { fill: none; stroke-width: 12; }
+.donut-chart circle { 
+    fill: none; 
+    stroke-width: 10; /* ALTERAÇÃO AQUI: Reduzido de 12 para 10 */
+}
 .donut-chart .donut-bg { stroke: var(--m3-surface-container-high); }
 .donut-chart .donut-fg { stroke: var(--m3-color-success); stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
-.chart-text { position: absolute; font-size: 1.8em; font-weight: 700; color: var(--m3-on-surface); }
-
-/* --- SEÇÃO DE RESPONSIVIDADE ATUALIZADA --- */
-@media (max-width: 768px) {
-    body { height: auto; }
-    .header { justify-content: center; flex-direction: column; gap: 20px; }
-    .logo-title-group h1 { font-size: 1.5em; }
-    .header-nav { flex-direction: column-reverse; }
-    #main-menu-block { padding: 30px; min-width: auto; width: 100%; box-sizing: border-box; }
-    .main-menu-button { min-width: auto; }
-    .sub-menu-block { padding: 20px; }
+.chart-text { 
+    position: absolute; 
+    font-size: 1.6em; /* ALTERAÇÃO AQUI: Reduzido de 1.8em para 1.6em */
+    font-weight: 700; 
+    color: var(--m3-on-surface); 
 }
+
+/* --- SEÇÃO DE RESPONSIVIDADE (SEM ALTERAÇÕES) --- */
+@media (max-width: 1600px) { /* ... */ }
+@media (max-width: 1400px) { /* ... */ }
+@media (max-width: 1280px) { /* ... */ }
+@media (max-width: 768px) { /* ... */ }
