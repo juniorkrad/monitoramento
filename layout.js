@@ -1,5 +1,5 @@
 // ==============================================================================
-// layout.js - Construtor de Layout (Cabeçalho, Rodapé e Timestamp) - VERSÃO FINAL
+// layout.js - Construtor de Layout (Cabeçalho, Rodapé e Timestamp)
 // ==============================================================================
 
 /**
@@ -9,20 +9,6 @@ function loadHeader(config) {
     const headerPlaceholder = document.getElementById('header-placeholder');
     if (!headerPlaceholder) return;
 
-    // Lógica para criar o botão
-    let buttonHtml = '';
-    if (config.buttonText && config.buttonLink) {
-        buttonHtml = `<a href="${config.buttonLink}" class="nav-button">${config.buttonText}</a>`;
-    }
-
-    // --- INÍCIO DA ALTERAÇÃO ---
-    // Cria o placeholder do timestamp SÓ SE a página pedir
-    let timestampHtml = '';
-    if (config.showTimestamp) {
-        timestampHtml = `<span id="update-timestamp">Buscando data...</span>`;
-    }
-    // --- FIM DA ALTERAÇÃO ---
-
     headerPlaceholder.innerHTML = `
         <header class="header">
             <div class="logo-title-group">
@@ -30,7 +16,8 @@ function loadHeader(config) {
                 <h1>${config.title}</h1>
             </div>
             <nav class="header-nav">
-                ${timestampHtml}  ${buttonHtml} 
+                <span id="update-timestamp"></span>
+                <a href="${config.buttonLink}" class="nav-button">${config.buttonText}</a>
             </nav>
         </header>
     `;
@@ -52,10 +39,13 @@ function loadFooter() {
 
 /**
  * Busca e exibe o timestamp da coleta de dados a partir da planilha.
+ * @param {string} sheetTab - O nome da aba da planilha (ex: 'HEL1', 'SBO1').
+ * @param {string} apiKey - A chave da API do Google.
+ * @param {string} sheetId - O ID da Planilha Google.
  */
 async function loadTimestamp(sheetTab, apiKey, sheetId) {
     const timestampEl = document.getElementById('update-timestamp');
-    if (!timestampEl) return; // Se a Home não criou o placeholder, a função para aqui.
+    if (!timestampEl) return;
 
     timestampEl.textContent = 'Buscando data...';
     const range = `${sheetTab}!K1`; // A célula onde o script Python salva a data
