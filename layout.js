@@ -1,20 +1,25 @@
 // ==============================================================================
-// layout.js - Construtor de Layout (Cabeçalho, Rodapé e Timestamp)
+// layout.js - Construtor de Layout (Cabeçalho, Rodapé e Timestamp) - VERSÃO FINAL
 // ==============================================================================
 
 /**
  * Constrói o cabeçalho da página.
- * Oculta o botão se config.buttonText ou config.buttonLink não forem fornecidos.
  */
 function loadHeader(config) {
     const headerPlaceholder = document.getElementById('header-placeholder');
     if (!headerPlaceholder) return;
 
-    // --- INÍCIO DA ALTERAÇÃO ---
-    // Cria o HTML do botão apenas se o texto e o link do botão existirem
+    // Lógica para criar o botão
     let buttonHtml = '';
     if (config.buttonText && config.buttonLink) {
         buttonHtml = `<a href="${config.buttonLink}" class="nav-button">${config.buttonText}</a>`;
+    }
+
+    // --- INÍCIO DA ALTERAÇÃO ---
+    // Cria o placeholder do timestamp SÓ SE a página pedir
+    let timestampHtml = '';
+    if (config.showTimestamp) {
+        timestampHtml = `<span id="update-timestamp">Buscando data...</span>`;
     }
     // --- FIM DA ALTERAÇÃO ---
 
@@ -25,8 +30,7 @@ function loadHeader(config) {
                 <h1>${config.title}</h1>
             </div>
             <nav class="header-nav">
-                <span id="update-timestamp"></span>
-                ${buttonHtml} 
+                ${timestampHtml}  ${buttonHtml} 
             </nav>
         </header>
     `;
@@ -51,7 +55,7 @@ function loadFooter() {
  */
 async function loadTimestamp(sheetTab, apiKey, sheetId) {
     const timestampEl = document.getElementById('update-timestamp');
-    if (!timestampEl) return;
+    if (!timestampEl) return; // Se a Home não criou o placeholder, a função para aqui.
 
     timestampEl.textContent = 'Buscando data...';
     const range = `${sheetTab}!K1`; // A célula onde o script Python salva a data
