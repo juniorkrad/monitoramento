@@ -4,10 +4,19 @@
 
 /**
  * Constrói o cabeçalho da página.
+ * Oculta o botão se config.buttonText ou config.buttonLink não forem fornecidos.
  */
 function loadHeader(config) {
     const headerPlaceholder = document.getElementById('header-placeholder');
     if (!headerPlaceholder) return;
+
+    // --- INÍCIO DA ALTERAÇÃO ---
+    // Cria o HTML do botão apenas se o texto e o link do botão existirem
+    let buttonHtml = '';
+    if (config.buttonText && config.buttonLink) {
+        buttonHtml = `<a href="${config.buttonLink}" class="nav-button">${config.buttonText}</a>`;
+    }
+    // --- FIM DA ALTERAÇÃO ---
 
     headerPlaceholder.innerHTML = `
         <header class="header">
@@ -17,7 +26,7 @@ function loadHeader(config) {
             </div>
             <nav class="header-nav">
                 <span id="update-timestamp"></span>
-                <a href="${config.buttonLink}" class="nav-button">${config.buttonText}</a>
+                ${buttonHtml} 
             </nav>
         </header>
     `;
@@ -39,9 +48,6 @@ function loadFooter() {
 
 /**
  * Busca e exibe o timestamp da coleta de dados a partir da planilha.
- * @param {string} sheetTab - O nome da aba da planilha (ex: 'HEL1', 'SBO1').
- * @param {string} apiKey - A chave da API do Google.
- * @param {string} sheetId - O ID da Planilha Google.
  */
 async function loadTimestamp(sheetTab, apiKey, sheetId) {
     const timestampEl = document.getElementById('update-timestamp');
