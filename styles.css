@@ -156,7 +156,7 @@ th, td {
     text-align: left; 
     border-top: 1px solid var(--m3-outline); 
     color: var(--m3-on-surface); 
-    font-size: 0.95em; /* Aumentei um pouquinho o padrão */
+    font-size: 0.95em; 
     
     white-space: nowrap;    
     vertical-align: middle; 
@@ -201,7 +201,7 @@ tbody tr:hover td {
 
 /* --- DESTAQUE PARA A COLUNA "PORTA" (Negrito) --- */
 tbody td:first-child {
-    font-weight: 700; /* Deixa "Porta 01" mais forte */
+    font-weight: 700; 
     color: var(--m3-on-surface);
 }
 
@@ -223,49 +223,75 @@ tbody td:first-child {
     text-overflow: ellipsis;
 }
 
-/* --- NOVO: BOTÃO DE STATUS CLICÁVEL --- */
+/* --- NOVO: BADGE DE CIRCUITO CLICÁVEL --- */
+.circuit-clickable {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.4);
+    transition: all 0.2s ease;
+}
+.circuit-clickable:hover {
+    background-color: var(--m3-primary);
+    color: #fff;
+    text-decoration: none;
+    box-shadow: 0 0 8px rgba(103, 7, 159, 0.6);
+    border-color: var(--m3-primary);
+}
+
+/* --- BOTÃO DE STATUS CLICÁVEL --- */
 .status-btn {
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.2s;
     border: none;
     font-family: inherit;
     font-weight: bold;
-    /* Removemos background/padding aqui pois a classe .status já cuida disso */
 }
 .status-btn:hover {
-    transform: scale(1.05); /* Efeito de clique */
-    filter: brightness(1.15); /* Fica mais claro */
+    transform: scale(1.05); 
+    filter: brightness(1.15); 
     box-shadow: 0 4px 10px rgba(0,0,0,0.4);
 }
 .status-btn:active {
-    transform: scale(0.95); /* Efeito de pressionar */
+    transform: scale(0.95); 
 }
 
-/* --- NOVO: ESTILOS DO MODAL (POP-UP) --- */
+/* --- ESTILOS DO MODAL (POP-UP) --- */
 .modal-overlay {
     display: none; 
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background-color: rgba(0, 0, 0, 0.75); /* Fundo bem escuro */
-    backdrop-filter: blur(5px); /* Efeito de vidro */
+    background-color: rgba(0, 0, 0, 0.75); 
+    backdrop-filter: blur(5px); 
     z-index: 9999;
     justify-content: center;
     align-items: center;
     animation: fadeInPage 0.2s ease-out;
 }
 
+/* --- ESTILO PADRÃO (PEQUENO/STATUS) - RESTAURADO AO CLÁSSICO --- */
 .modal-content {
     background-color: var(--m3-surface-container);
     border: 1px solid var(--m3-outline);
     border-radius: 16px;
     width: 90%;
+    
+    /* Tamanho original que você gostou */
     max-width: 400px; 
+    
     padding: 0;
     box-shadow: 0 20px 50px rgba(0,0,0,0.6);
     overflow: hidden;
     transform: scale(0.9);
     animation: popIn 0.2s forwards;
+    
+    transition: max-width 0.3s ease-in-out, width 0.3s ease-in-out;
+}
+
+/* --- ESTILO EXPANDIDO (GRANDE/CLIENTES) --- */
+.modal-content.modal-large {
+    max-width: 900px; 
+    width: 95%; 
 }
 
 @keyframes popIn {
@@ -290,27 +316,32 @@ tbody td:first-child {
 }
 .close-modal:hover { color: var(--m3-color-error); }
 
-.modal-body { padding: 25px; }
+.modal-body { 
+    padding: 25px; /* Restaurado para o padding original */
+}
 
-/* Grid dos números dentro do modal */
+/* --- GRID DOS NÚMEROS - RESTAURADO AO CLÁSSICO --- */
 .modal-stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 15px;
+    display: grid; /* Voltamos para Grid */
+    grid-template-columns: 1fr 1fr 1fr; /* 3 Colunas iguais */
+    gap: 15px; /* Espaçamento original */
     text-align: center;
 }
+
 .modal-stat-box {
-    background-color: rgba(0,0,0,0.2);
-    padding: 15px 5px;
+    background-color: rgba(0,0,0,0.2); 
+    padding: 15px 5px; /* Padding original moderado */
     border-radius: 12px;
     border: 1px solid var(--m3-outline);
 }
+
 .modal-stat-value {
     display: block;
-    font-size: 1.8em;
+    font-size: 1.8em; /* Tamanho original que estava bom */
     font-weight: 700;
     margin-bottom: 5px;
 }
+
 .modal-stat-label {
     font-size: 0.75em;
     color: var(--m3-on-surface-variant);
@@ -321,6 +352,63 @@ tbody td:first-child {
 .val-online { color: var(--m3-color-success); }
 .val-offline { color: var(--m3-color-error); }
 .val-total { color: var(--m3-on-surface); }
+
+/* --- NOVOS ESTILOS PARA LISTA DE CLIENTES (POP-UP) --- */
+.modal-section-title {
+    font-size: 1.1rem;
+    color: var(--m3-on-surface);
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--m3-outline);
+    padding-bottom: 5px;
+    font-weight: 500;
+}
+
+.client-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-top: 15px;
+    border: 1px solid var(--m3-outline);
+    border-radius: 8px;
+    background-color: rgba(0,0,0,0.2);
+}
+
+.client-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    color: var(--m3-on-surface);
+}
+
+/* Ocultar Cabeçalho da tabela de clientes */
+.client-table thead {
+    display: none;
+}
+
+.client-table th {
+    background-color: var(--m3-surface-container-high);
+    color: var(--m3-on-primary);
+    padding: 10px 12px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.client-table td {
+    border-bottom: 1px solid var(--m3-outline);
+    padding: 8px 12px;
+    color: var(--m3-on-surface-variant);
+}
+
+.client-table tr:nth-child(even) td {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.client-table tr:hover td {
+    background-color: var(--m3-state-layer-hover);
+    color: var(--m3-on-surface);
+}
 
 /* ------------------------------------- */
 
@@ -366,4 +454,6 @@ tbody td:first-child {
     #main-menu-block { padding: 30px; min-width: auto; width: 100%; box-sizing: border-box; }
     .main-menu-button { min-width: auto; }
     .sub-menu-block { padding: 20px; }
+    /* Ajuste do modal para telas pequenas */
+    .modal-content { width: 95% !important; max-width: none !important; }
 }
