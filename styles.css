@@ -34,9 +34,39 @@
     background: var(--m3-primary-hover); 
 }
 
+/* --- ÍCONES MATERIAL SYMBOLS ROUNDED (CONFIGURAÇÃO) --- */
+.material-symbols-rounded {
+    font-family: 'Material Symbols Rounded';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;  /* Tamanho base */
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    vertical-align: middle; 
+
+    /* --- CONFIGURAÇÃO DO TRAÇO FINO (Light 300) --- */
+    font-variation-settings: 
+        'FILL' 0,
+        'wght' 300, 
+        'GRAD' 0,
+        'opsz' 24;
+}
+
+/* Classes auxiliares para cores dos ícones */
+.icon-up { color: var(--m3-color-success); font-size: 20px; }
+.icon-down { color: var(--m3-color-error); font-size: 20px; }
+.icon-total { color: var(--m3-on-surface); font-size: 20px; }
+
+
 html { 
     height: 100%; 
 }
+
 body {
     background-color: var(--m3-surface);
     color: var(--m3-on-surface);
@@ -55,7 +85,6 @@ body.home-page {
     flex: 1; display: flex; flex-direction: column; min-height: 0;
 }
 
-/* Permite a rolagem na Home */
 .home-page .main-content { 
     overflow-y: auto; 
     padding-right: 5px; 
@@ -70,32 +99,47 @@ body.home-page {
 .logo-title-group h1 { font-size: 1.5em; font-weight: 500; margin: 0; color: var(--m3-on-surface); }
 .header-nav { display: flex; align-items: center; gap: 15px; }
 
-/* Estilo do Botão Home/Voltar */
-.nav-button {
-    background-color: #371752; 
+/* Botão Home/Voltar (SEM BORDA) */
+.icon-btn {
+    background-color: #371752;
     color: var(--m3-on-primary);
-    padding: 8px 20px;
-    border-radius: 20px;
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.2s ease;
-    border: none;
+    border: none; 
+    border-radius: 50%; 
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     cursor: pointer;
-    font-size: 0.9em;
-    display: inline-block;
+    transition: all 0.2s ease;
+    text-decoration: none;
 }
-.nav-button:hover {
+.icon-btn:hover {
     background-color: var(--m3-primary-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    transform: scale(1.1);
+    box-shadow: 0 0 10px var(--m3-primary-hover);
 }
 
-/* Timestamp Animado */
+/* Timestamp Estilo Cápsula (SEM BORDA) */
 .timestamp-badge { 
-    font-size: 1em; 
+    font-size: 0.85em; 
     color: var(--m3-on-surface-variant); 
     transition: color 0.3s ease;
+    display: flex;       
+    align-items: center;
+    gap: 8px; 
+    background-color: rgba(0, 0, 0, 0.2); 
+    border: none; 
+    border-radius: 50px; 
+    padding: 6px 16px; 
+    white-space: nowrap; 
 }
+.timestamp-badge .material-symbols-rounded {
+    font-size: 16px; 
+    color: var(--m3-primary); 
+    margin-right: 2px; 
+}
+
 @keyframes textFlash {
     0% { color: var(--m3-primary); text-shadow: 0 0 10px var(--m3-primary); }
     100% { color: var(--m3-on-surface-variant); text-shadow: none; }
@@ -132,7 +176,7 @@ body.home-page {
     display: grid;
     gap: 15px; 
     padding-bottom: 20px;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     align-content: flex-start;
     width: 100%;
 }
@@ -157,12 +201,10 @@ th, td {
     border-top: 1px solid var(--m3-outline); 
     color: var(--m3-on-surface); 
     font-size: 0.95em; 
-     
     white-space: nowrap;    
     vertical-align: middle; 
 }
 
-/* LINHA 1: TÍTULO */
 .table-title-row th {
     background-color: var(--m3-surface-container); 
     color: var(--m3-on-surface); 
@@ -174,7 +216,6 @@ th, td {
     font-weight: 700;
 }
 
-/* LINHA 2: CABEÇALHO */
 .table-header-row th {
     background-color: var(--m3-surface-container-high); 
     color: var(--m3-on-surface);
@@ -183,7 +224,6 @@ th, td {
     letter-spacing: 0.5px;
     font-size: 0.85em;
     padding: 8px 10px; 
-     
     border-top: none; 
     border-bottom: 1px solid var(--m3-outline);
     position: sticky;
@@ -191,19 +231,9 @@ th, td {
     z-index: 1;
 }
 
-/* Correção da borda duplicada */
 thead + tbody tr:first-child td { border-top: none; }
-
-/* Efeito Hover nas linhas */
-tbody tr:hover td {
-    background-color: var(--m3-state-layer-hover); 
-}
-
-/* --- DESTAQUE PARA A COLUNA "PORTA" (Negrito) --- */
-tbody td:first-child {
-    font-weight: 700; 
-    color: var(--m3-on-surface);
-}
+tbody tr:hover td { background-color: var(--m3-state-layer-hover); }
+tbody td:first-child { font-weight: 700; color: var(--m3-on-surface); }
 
 /* --- BADGE INTELIGENTE (CIRCUITOS) --- */
 .circuit-badge {
@@ -223,7 +253,6 @@ tbody td:first-child {
     text-overflow: ellipsis;
 }
 
-/* --- NOVO: BADGE DE CIRCUITO CLICÁVEL --- */
 .circuit-clickable {
     cursor: pointer;
     text-decoration: underline;
@@ -238,7 +267,6 @@ tbody td:first-child {
     border-color: var(--m3-primary);
 }
 
-/* --- BOTÃO DE STATUS CLICÁVEL --- */
 .status-btn {
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.2s;
@@ -246,14 +274,8 @@ tbody td:first-child {
     font-family: inherit;
     font-weight: bold;
 }
-.status-btn:hover {
-    transform: scale(1.05); 
-    filter: brightness(1.15); 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-}
-.status-btn:active {
-    transform: scale(0.95); 
-}
+.status-btn:hover { transform: scale(1.05); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+.status-btn:active { transform: scale(0.95); }
 
 /* --- ESTILOS DO MODAL (POP-UP) --- */
 .modal-overlay {
@@ -269,13 +291,12 @@ tbody td:first-child {
     animation: fadeInPage 0.2s ease-out;
 }
 
-/* --- BASE DO MODAL (Comum a todos) --- */
 .modal-content {
     background-color: var(--m3-surface-container);
     border: 1px solid var(--m3-outline);
     border-radius: 16px;
     width: 90%;
-    max-width: 400px; /* Default: Pequeno (Status) */
+    max-width: 400px; 
     padding: 0;
     box-shadow: 0 20px 50px rgba(0,0,0,0.6);
     overflow: hidden;
@@ -283,21 +304,10 @@ tbody td:first-child {
     animation: popIn 0.2s forwards;
     transition: max-width 0.3s ease-in-out, width 0.3s ease-in-out;
 }
+.modal-content.modal-status { max-width: 450px; }
+.modal-content.modal-large { max-width: 900px; width: 95%; }
 
-/* --- VARIANTE 1: MODAL DE STATUS (ETIQUETA DO JS) --- */
-.modal-content.modal-status {
-    max-width: 450px; /* Um pouco mais largo para os blocos */
-}
-
-/* --- VARIANTE 2: MODAL GRANDE (CLIENTES) --- */
-.modal-content.modal-large {
-    max-width: 900px; 
-    width: 95%; 
-}
-
-@keyframes popIn {
-    to { transform: scale(1); }
-}
+@keyframes popIn { to { transform: scale(1); } }
 
 .modal-header {
     background-color: var(--m3-surface-container-high);
@@ -319,9 +329,8 @@ tbody td:first-child {
 
 .modal-body { padding: 25px; }
 
-/* --- GRID DOS NÚMEROS (STATUS) - OTIMIZADO --- */
 .modal-stats-grid {
-    display: flex; /* Mudança para Flex para distribuição igual */
+    display: flex; 
     justify-content: space-between;
     gap: 15px;
     width: 100%;
@@ -329,10 +338,10 @@ tbody td:first-child {
 
 .modal-stat-box {
     background-color: rgba(0,0,0,0.25); 
-    padding: 20px 10px; /* Padding generoso */
+    padding: 20px 10px; 
     border-radius: 12px;
     border: 1px solid var(--m3-outline);
-    flex: 1; /* Força largura igual para os 3 blocos */
+    flex: 1; 
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -341,7 +350,7 @@ tbody td:first-child {
 
 .modal-stat-value {
     display: block;
-    font-size: 2.2em; /* Tamanho GRANDE */
+    font-size: 2.2em; 
     font-weight: 700;
     margin-bottom: 5px;
     line-height: 1;
@@ -359,7 +368,6 @@ tbody td:first-child {
 .val-offline { color: var(--m3-color-error); }
 .val-total { color: var(--m3-on-surface); }
 
-/* --- AJUSTES DA TABELA DE CLIENTES --- */
 .modal-section-title {
     font-size: 1.1rem;
     color: var(--m3-on-surface);
@@ -378,79 +386,135 @@ tbody td:first-child {
     background-color: rgba(0,0,0,0.2);
 }
 
-.client-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-    color: var(--m3-on-surface);
-    /* Mantemos auto para o navegador ajustar as colunas conforme conteúdo */
-    table-layout: auto; 
-}
-
-.client-table th {
-    background-color: var(--m3-surface-container-high);
-    color: var(--m3-on-primary);
-    padding: 10px 12px;
-    text-align: left;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
-
-.client-table td {
-    border-bottom: 1px solid var(--m3-outline);
-    padding: 8px 12px;
-    color: var(--m3-on-surface-variant);
-}
-
-.client-table tr:nth-child(even) td {
-    background-color: rgba(255, 255, 255, 0.03);
-}
-
-.client-table tr:hover td {
-    background-color: var(--m3-state-layer-hover);
-    color: var(--m3-on-surface);
-}
-
-/* Ocultar Cabeçalho da tabela de clientes (pois já não estava usando) */
-.client-table thead {
-    display: none;
-}
-
-/* --- ESTILOS DOS FILTROS --- */
+/* FILTROS */
 .filter-bar { display: flex; gap: 10px; margin-bottom: 10px; }
 .filter-input { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #5c4e72; background-color: rgba(0,0,0,0.2); color: #fff; }
 .filter-select { padding: 8px; border-radius: 4px; border: 1px solid #5c4e72; background-color: #3a1c63; color: #fff; cursor: pointer; }
 
-/* ------------------------------------- */
-
+/* STATUS GERAIS */
 .status { font-weight: bold; padding: 4px 12px; border-radius: 20px; display: inline-block; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.5px; }
 .status-normal { background-color: var(--m3-color-success); color: #fff; }
 .status-atencao { background-color: var(--m3-color-warning); color: #000; }
 .status-problema { background-color: var(--m3-color-error); color: #fff; }
 
-.overview-card { background-color: var(--m3-surface-container); border-radius: 12px; border: 1px solid var(--m3-outline); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: transform 0.2s ease, border-color 0.2s ease; }
+/* --- CARD DO DASHBOARD (SEM BORDA) --- */
+.overview-card { 
+    background-color: var(--m3-surface-container); 
+    border-radius: 12px; 
+    border: none;
+    overflow: hidden; 
+    display: flex; 
+    flex-direction: column; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3); 
+    transition: transform 0.2s ease, border-color 0.2s ease; 
+    max-width: 380px;  
+    width: 100%;       
+    margin: 0 auto;    
+}
+
 .overview-card:hover { transform: translateY(-4px); border-color: var(--m3-primary); }
 .card-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 15px; transition: background-color 0.5s ease; }
-.card-header h3 { margin: 0; font-size: 1.3em; font-weight: 500; color: var(--m3-on-surface); }
+.card-header h3 { margin: 0; font-size: 1.3em; font-weight: 500; color: var(--m3-on-surface); display: flex; align-items: center; gap: 8px; }
+
 .card-header.status-normal { background-color: var(--m3-color-success); }
 .card-header.status-atencao { background-color: var(--m3-color-warning); }
 .card-header.status-problema { background-color: var(--m3-color-error); }
 .card-header.status-normal h3, .card-header.status-problema h3 { color: #fff; }
 .card-header.status-atencao h3 { color: #000; }
-.card-header-button { background-color: rgba(0, 0, 0, 0.2); color: var(--m3-on-surface-variant); padding: 4px 10px; border-radius: 16px; text-decoration: none; font-size: 0.85em; font-weight: 500; transition: background-color 0.2s ease, color 0.2s ease; }
+
+.card-header-button { 
+    background-color: rgba(0, 0, 0, 0.2); 
+    color: var(--m3-on-surface-variant); 
+    padding: 4px 10px; 
+    border-radius: 16px; 
+    text-decoration: none; 
+    font-size: 0.85em; 
+    font-weight: 500; 
+    transition: background-color 0.2s ease, color 0.2s ease; 
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
 .card-header-button:hover { background-color: rgba(0, 0, 0, 0.4); color: var(--m3-on-surface); }
 .card-header.status-normal .card-header-button, .card-header.status-problema .card-header-button { color: rgba(255,255,255,0.8); }
 .card-header.status-atencao .card-header-button { color: rgba(0,0,0,0.7); }
-.card-body { flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 15px; gap: 10px; }
-.card-stats { display: flex; flex-direction: column; gap: 5px; }
-.stat-item { display: flex; align-items: baseline; gap: 8px; }
-.stat-item span { font-size: 1.8em; font-weight: 700; line-height: 1; }
-.stat-item label { font-size: 0.9em; color: var(--m3-on-surface-variant); }
+
+/* --- ESTRUTURA DO BODY DO CARD (AGORA COM POSITION RELATIVE) --- */
+.card-body { 
+    flex: 1; 
+    display: flex; 
+    align-items: center; 
+    justify-content: flex-start; /* Alinhado ao início */
+    padding: 15px; 
+    position: relative; /* Referência para o gráfico absoluto */
+}
+
+/* Espaço Protegido para o Gráfico (110px na direita) */
+.card-stats { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 5px; 
+    flex: 1; 
+    padding-right: 110px; 
+}
+
+/* LINHA DO GRID (VALORES DETERMINADOS E FIXOS) */
+.stat-item { 
+    display: grid;
+    /* --- MUDANÇA AQUI: 70px (fixo) + 1fr (resto fixo) --- */
+    grid-template-columns: 70px 1fr; 
+    align-items: center; 
+    gap: 10px; /* Gap fixo de 10px */
+}
+
+/* Coluna 1: O Número */
+.stat-item span { 
+    font-size: 1.8em; 
+    font-weight: 700; 
+    line-height: 1; 
+    
+    /* Alinhado à ESQUERDA */
+    text-align: left; 
+    
+    /* Removemos min-width pois a coluna já é fixa em 70px */
+    width: 100%;
+}
+
+/* Coluna 2: O Texto + Ícone */
+.stat-item label { 
+    font-size: 0.9em; 
+    color: var(--m3-on-surface-variant); 
+    display: flex; 
+    align-items: center; 
+    gap: 4px; 
+    white-space: nowrap; 
+    justify-content: flex-start; 
+}
+
+/* --- ESTABILIZAÇÃO DOS ÍCONES --- */
+.stat-item label .material-symbols-rounded {
+    width: 20px; 
+    text-align: center; 
+    font-size: 20px;
+}
+
 .stat-item.online span { color: var(--m3-color-success); }
 .stat-item.offline span { color: var(--m3-color-error); }
-.donut-chart-container { position: relative; display: flex; justify-content: center; align-items: center; }
+
+/* --- GRÁFICO FIXO ABSOLUTO À DIREITA --- */
+.donut-chart-container { 
+    position: absolute; /* Sai do fluxo normal */
+    right: 15px;        /* Grudado na direita */
+    top: 50%;           /* Centralizado verticalmente */
+    transform: translateY(-50%); 
+    
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    width: 100px;
+    height: 100px;
+}
+
 .donut-chart { transform: rotate(-90deg); }
 .donut-chart circle { fill: none; stroke-width: 10; }
 .donut-chart .donut-bg { stroke: var(--m3-surface-container-high); }
@@ -467,20 +531,7 @@ tbody td:first-child {
     #main-menu-block { padding: 30px; min-width: auto; width: 100%; box-sizing: border-box; }
     .main-menu-button { min-width: auto; }
     .sub-menu-block { padding: 20px; }
-    /* Ajuste do modal para telas pequenas */
     .modal-content { width: 95% !important; max-width: none !important; }
-
-    /* --- CORREÇÃO DO FILTRO MOBILE --- */
-    /* Empilha o campo de busca e o select um sobre o outro */
-    .filter-bar {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-    }
-    
-    /* Garante que ambos ocupem 100% da largura sem estourar */
-    .filter-input, .filter-select {
-        width: 100%;
-        box-sizing: border-box; /* Impede que o padding some na largura total */
-    }
+    .filter-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .filter-input, .filter-select { width: 100%; box-sizing: border-box; }
 }
