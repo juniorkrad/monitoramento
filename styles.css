@@ -150,28 +150,26 @@ body.home-page {
 
 .footer { margin-top: 10px; padding: 8px 0; border-top: 1px solid var(--m3-outline); text-align: center; color: var(--m3-on-surface-variant); font-size: 0.85em; }
 
-/* --- TOAST NOTIFICATIONS (ATUALIZADO COM ROLAGEM) --- */
+/* --- TOAST NOTIFICATIONS (AJUSTADO PARA MOBILE E SEM ESPAÇOS EXTRAS) --- */
 #toast-container { 
     position: fixed; 
     top: 20px; 
-    right: 20px; 
-    z-index: 2001; /* Z-index aumentado para ficar acima do menu */
+    right: 10px; /* Mais próximo da borda */
+    z-index: 2001;
     display: flex; 
     flex-direction: column; 
+    align-items: flex-end; /* Alinha à direita */
     gap: 10px; 
     
-    /* Configuração da Rolagem */
-    max-height: 80vh;      /* Limita altura a 80% da tela */
-    overflow-y: auto;      /* Barra de rolagem se necessário */
+    max-height: 80vh;      
+    overflow-y: auto;      
     overflow-x: hidden;
-    padding-right: 5px;
-    padding-bottom: 10px;
+    
+    /* Padding reduzido: Suficiente para sombra, mas não afasta tanto da borda */
+    padding: 10px; 
 }
 
-/* Barra de rolagem específica para os alertas */
-#toast-container::-webkit-scrollbar {
-    width: 6px;
-}
+#toast-container::-webkit-scrollbar { width: 4px; }
 
 .toast { 
     background-color: #333; 
@@ -185,14 +183,60 @@ body.home-page {
     transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
     cursor: pointer;
     
-    /* Garante estabilidade visual */
     flex-shrink: 0; 
-    width: 300px;
+    
+    /* MUDANÇA: LARGURA FLUIDA */
+    width: auto;             /* Ajusta ao conteúdo */
+    min-width: 250px;        /* Tamanho mínimo para não ficar muito pequeno */
+    max-width: 350px;        /* Tamanho máximo */
+    
+    display: flex;
+    align-items: center;
 }
 .toast.show { opacity: 1; transform: translateX(0); }
 .toast.problem { background-color: var(--m3-color-error); color: #fff; font-weight: 500; }
 .toast.status-normal { background-color: var(--m3-color-success); color: #fff; font-weight: 500; }
 .toast.warning { background-color: var(--m3-color-warning); color: #000; font-weight: 500; }
+
+/* --- SUPER PRIORIDADE (LUZ DE EMERGÊNCIA + AJUSTES DE LARGURA) --- */
+.toast.super-priority {
+    background-color: #000000 !important; 
+    color: #FF1744 !important;            
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    
+    animation: pulseCritical 1.5s infinite ease-in-out; 
+    border: 2px solid #8b0000;            
+    
+    /* MUDANÇA: Tamanho fluido e fonte maior */
+    width: auto;
+    min-width: 280px;
+    max-width: 400px; /* Permite crescer mais se o texto for longo */
+    font-size: 1.2em;                     
+}
+
+.toast.super-priority .toast-icon {
+    font-size: 36px !important; 
+    color: #FF1744;
+    animation: shakeIcon 0.5s infinite; 
+}
+
+/* Animações */
+@keyframes pulseCritical {
+    0% { box-shadow: 0 0 0 rgba(255, 23, 68, 0); border-color: #8b0000; }
+    50% { box-shadow: 0 0 40px rgba(255, 23, 68, 0.7); border-color: #FF1744; } 
+    100% { box-shadow: 0 0 0 rgba(255, 23, 68, 0); border-color: #8b0000; }
+}
+
+@keyframes shakeIcon {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(5deg); }
+    75% { transform: rotate(-5deg); }
+    100% { transform: rotate(0deg); }
+}
+
+/* ------------------------------------------------ */
 
 .main-content { display: flex; position: relative; }
 .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; opacity: 0; visibility: hidden; transition: opacity 0.4s ease, visibility 0.4s ease; }
@@ -630,7 +674,7 @@ tbody td:first-child { font-weight: 700; color: var(--m3-on-surface); }
     color: var(--m3-on-surface); 
     font-weight: 700;
     font-size: 1.1rem; 
-    padding: 15px;     
+    padding: 15px;      
     background-color: rgba(255, 255, 255, 0.03);
     margin-bottom: 5px;
     justify-content: center; /* Centraliza conteúdo do Home */
@@ -687,4 +731,16 @@ tbody td:first-child { font-weight: 700; color: var(--m3-on-surface); }
     .modal-content { width: 95% !important; max-width: none !important; }
     .filter-bar { flex-direction: column; align-items: stretch; gap: 10px; }
     .filter-input, .filter-select { width: 100%; box-sizing: border-box; }
+    
+    /* SEGURANÇA EXTRA PARA CELULAR */
+    /* Garante que o container de alertas não fique "sobrando" no mobile */
+    #toast-container {
+        right: 0;
+        left: 0; /* Centraliza ou ocupa largura */
+        align-items: center; /* No mobile, centralizar pode ser melhor */
+        padding: 10px;
+    }
+    .toast, .toast.super-priority {
+        max-width: 90vw; /* Garante que nunca passe da tela do celular */
+    }
 }
