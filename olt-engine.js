@@ -1,5 +1,5 @@
 // ==============================================================================
-// olt-engine.js - Versão 5.2 (Sem cabeçalhos técnicos no Modal)
+// olt-engine.js - Versão 5.4 (Título do modal inclui "Circuito: Nome")
 // ==============================================================================
 
 const ENGINE_API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
@@ -315,7 +315,7 @@ function startOltMonitoring(config) {
                         </td>
                         <td>
                             <button class="status ${statusClass} status-btn" 
-                                onclick="openPortDetails('${placa}', '${porta}', ${online}, ${offline}, ${total})">
+                                onclick="openPortDetails('${placa}', '${porta}', '${info}', ${online}, ${offline}, ${total})">
                                 ${statusText}
                             </button>
                         </td>
@@ -348,7 +348,8 @@ function closeModal(event) {
     document.getElementById('detail-modal').style.display = 'none';
 }
 
-function openPortDetails(placa, porta, online, offline, total) {
+// MUDANÇA AQUI: Adicionado "Circuito:" no texto formatado
+function openPortDetails(placa, porta, circuito, online, offline, total) {
     const modal = document.getElementById('detail-modal');
     const modalContent = document.querySelector('.modal-content');
 
@@ -356,7 +357,10 @@ function openPortDetails(placa, porta, online, offline, total) {
     modalContent.classList.remove('modal-large'); 
     modalContent.classList.add('modal-status');   
 
-    document.getElementById('modal-title').textContent = `Placa ${placa} / Porta ${porta} - Status`;
+    // Formata o título: "Placa X / Porta Y - Circuito: NomeDoCircuito"
+    // Se não houver circuito, mostra apenas a placa/porta
+    const textoCircuito = (circuito && circuito !== "-") ? ` - Circuito: ${circuito}` : "";
+    document.getElementById('modal-title').textContent = `Placa ${placa} / Porta ${porta}${textoCircuito}`;
     
     document.getElementById('view-stats').style.display = 'flex';
     document.getElementById('view-clients').style.display = 'none';
