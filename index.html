@@ -22,6 +22,9 @@
         <div id="header-placeholder"></div>
 
         <main class="main-content" style="flex-direction: column;">
+            
+            <div id="backbone-alert-container" style="display: none; width: 100%; margin-bottom: 20px;"></div>
+
             <div id="global-overview-container" style="margin-bottom: 20px; width: 100%;"></div>
             
             <div id="overview-grid" class="grid-container">
@@ -60,7 +63,6 @@
         const REFRESH_INTERVAL_SECONDS = 300;
         
         function createCardPlaceholders() {
-            // Cria o Placeholder Global
             const globalContainer = document.getElementById('global-overview-container');
             globalContainer.innerHTML = `
                 <div class="overview-card global-card" id="card-global" style="max-width: 100%;">
@@ -79,9 +81,8 @@
             `;
 
             const grid = document.getElementById('overview-grid');
-            grid.innerHTML = ''; // Limpa o grid antes de popular
+            grid.innerHTML = ''; 
             
-            // Loop das OLTs normais primeiro
             oltsConfig.forEach(olt => {
                 const pageUrl = olt.id.toLowerCase().replace('-', '') + '.html';
                 grid.innerHTML += `
@@ -102,7 +103,6 @@
                 `;
             });
 
-            // CARD DE MÓDULO EXCLUSIVO (Adicionado no final da grelha)
             grid.innerHTML += `
                 <a href="equipamentos.html" class="overview-card" style="text-decoration: none; display: flex; flex-direction: column; border: 1px solid var(--m3-primary); background: linear-gradient(145deg, var(--m3-surface-container), var(--m3-surface-container-high));">
                     <div class="card-header" style="background-color: transparent; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px;">
@@ -170,44 +170,65 @@
                     }
                 });
 
-                let hasSuperPriority = false;
-                let hasCritical = false;     
-                let hasWarning = false;       
+                // ==========================================
+                // LÓGICA DE ALARMES V3 (TRAVA DE 5 CLIENTES)
+                // ==========================================
+                let isMicroSuper = false;
+                let isCritical = false;     
+                let isWarning = false;
+                let ports100Down = 0;
+                let hasBackbone = false;
 
-                const totalClients = totalOnline + totalOffline;
-                if (totalClients > 0 && (totalOffline / totalClients) > 0.5) {
-                    hasSuperPriority = true;
-                }
+                for (const key in portData) {
+                    const { off, total } = portData[key];
+                    if (total === 0) continue; 
 
-                if (!hasSuperPriority) {
-                    for (const key in portData) {
-                        const { off, total } = portData[key];
-                        if (total < 5) continue; 
+                    const percOffline = off / total;
 
-                        if (total > 0 && (off / total) > 0.5) {
-                            hasSuperPriority = true;
-                            break; 
+                    // --- TRAVA DE SEGURANÇA: MÍNIMO 5 CLIENTES NA PORTA ---
+                    if (total >= 5) {
+                        // Gatilho de Backbone (Porta 100% OFF)
+                        if (percOffline === 1) {
+                            ports100Down++;
+                            isMicroSuper = true; 
                         }
-                        if (off > 16 || (total > 0 && (off / total) === 0.5)) {
-                            hasCritical = true;
-                        } else if (off === 16) {
-                            hasWarning = true;
+                        // OLTs Padrão
+                        else if (percOffline >= 0.5) {
+                            isMicroSuper = true;
+                        } else if (off >= 32) {
+                            isCritical = true; 
+                        } else if (off >= 16 && off < 32) {
+                            isWarning = true;  
                         }
                     }
                 }
 
-                if (hasSuperPriority) localProblems.add(`[${olt.id}] STATUS::SUPER`);
-                else if (hasCritical) localProblems.add(`[${olt.id}] STATUS::CRIT`);
-                else if (hasWarning) localProblems.add(`[${olt.id}] STATUS::WARN`);
+                if (ports100Down >= 2) {
+                    hasBackbone = true;
+                } else if (isMicroSuper) {
+                    localProblems.add(`[${olt.id}] STATUS::SUPER`);
+                } else if (isCritical) {
+                    localProblems.add(`[${olt.id}] STATUS::CRIT`);
+                } else if (isWarning) {
+                    localProblems.add(`[${olt.id}] STATUS::WARN`);
+                }
 
                 updateCardUI(olt.id, { onlineCount: totalOnline, offlineCount: totalOffline, type: olt.type });
                 
-                return { id: olt.id, problems: localProblems, onlineCount: totalOnline, offlineCount: totalOffline, type: olt.type };
+                return { 
+                    id: olt.id, 
+                    problems: localProblems, 
+                    onlineCount: totalOnline, 
+                    offlineCount: totalOffline, 
+                    type: olt.type,
+                    hasBackbone: hasBackbone,
+                    backboneDetails: hasBackbone ? `OLT: ${olt.id}` : null
+                };
 
             } catch (error) {
                 console.error(`Erro para OLT ${olt.id}:`, error);
                 updateCardUI(olt.id, { error: true });
-                return { id: olt.id, problems: new Set(), onlineCount: 0, offlineCount: 0, type: olt.type };
+                return { id: olt.id, problems: new Set(), onlineCount: 0, offlineCount: 0, type: olt.type, hasBackbone: false };
             }
         }
         
@@ -264,7 +285,6 @@
             card.querySelector('.card-body').innerHTML = `<div class="card-stats">${statsHtml}</div>${chartHtml}`;
         }
 
-        // --- NOVA FUNÇÃO: Atualiza o Card Gigante (Versão Definitiva com Imagens e sem títulos) ---
         function updateGlobalCardUI(globalOnline, globalOffline, nokiaOnline, nokiaTotal, furukawaOnline, furukawaTotal, top3Olts) {
             const card = document.getElementById('card-global');
             if (!card) return;
@@ -280,7 +300,6 @@
             else if (offlinePercent > 5) { header.classList.add('status-atencao'); }
             else { header.classList.add('status-normal'); }
             
-            // Coluna 1: Totais (Esquerda)
             const statsHtml = `
                 <div class="stat-item global-stat">
                     <span class="stat-number">${total}</span>
@@ -296,7 +315,6 @@
                 </div>
             `;
 
-            // Coluna 2: Fabricantes (Centro com Imagens - Título Removido, Fontes Aumentadas)
             const nokiaPct = nokiaTotal > 0 ? (nokiaOnline / nokiaTotal) * 100 : 0;
             const furukawaPct = furukawaTotal > 0 ? (furukawaOnline / furukawaTotal) * 100 : 0;
             
@@ -330,7 +348,6 @@
                 </div>
             `;
 
-            // Coluna 3: Ranking Top 3 (Direita - Título Removido, Fontes Aumentadas)
             let rankingHtmlContent = '';
             const temOffline = top3Olts.some(olt => olt.offline > 0);
             
@@ -367,7 +384,6 @@
                 </div>
             `;
             
-            // Montagem Flexbox 3 Colunas (Alinhamento alterado de flex-start para center)
             card.querySelector('.card-body').innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 20px;">
                     <div class="card-stats" style="padding-right: 0; min-width: 200px;">${statsHtml}</div>
@@ -396,12 +412,12 @@
             let globalOnline = 0;
             let globalOffline = 0;
             
-            // Variáveis para Fabricantes
             let nokiaOnline = 0, nokiaTotal = 0;
             let furukawaOnline = 0, furukawaTotal = 0;
             
-            // Lista para o Ranking
             let oltStatsList = [];
+            let activeBackboneDetails = []; 
+            let currentBackbones = new Set(); 
 
             results.forEach(result => {
                 result.problems.forEach(problem => allProblems.add(problem));
@@ -409,8 +425,6 @@
                 globalOffline += result.offlineCount;
                 
                 let oltTotal = result.onlineCount + result.offlineCount;
-                
-                // Contabilidade por fabricante
                 if (result.type === 'nokia') {
                     nokiaOnline += result.onlineCount;
                     nokiaTotal += oltTotal;
@@ -419,23 +433,38 @@
                     furukawaTotal += oltTotal;
                 }
 
-                // Lista de Status para o ranking
-                oltStatsList.push({
-                    id: result.id,
-                    offline: result.offlineCount,
-                    total: oltTotal
-                });
+                oltStatsList.push({ id: result.id, offline: result.offlineCount, total: oltTotal });
+
+                if (result.hasBackbone) {
+                    activeBackboneDetails.push(result.backboneDetails);
+                    currentBackbones.add(result.id);
+                }
             });
 
-            // Prepara o Top 3
             oltStatsList.sort((a, b) => b.offline - a.offline);
             const top3Olts = oltStatsList.slice(0, 3);
 
-            // Envia todos os dados para a função de renderização
             updateGlobalCardUI(globalOnline, globalOffline, nokiaOnline, nokiaTotal, furukawaOnline, furukawaTotal, top3Olts);
 
+            const backboneContainer = document.getElementById('backbone-alert-container');
+            if (activeBackboneDetails.length > 0) {
+                backboneContainer.innerHTML = `
+                    <div class=\"backbone-alert\">
+                        <span class=\"material-symbols-rounded\">sos</span>
+                        <div class=\"backbone-text-container\">
+                            <p class=\"backbone-title\">Rompimento de Backbone?!</p>
+                            <p class=\"backbone-details\">${activeBackboneDetails.join('<br>')}</p>
+                        </div>
+                    </div>
+                `;
+                backboneContainer.style.display = 'block';
+            } else {
+                backboneContainer.style.display = 'none';
+                backboneContainer.innerHTML = '';
+            }
+
             if (typeof checkAndNotifyForNewProblems === 'function') {
-                checkAndNotifyForNewProblems(allProblems);
+                checkAndNotifyForNewProblems(allProblems, currentBackbones);
             }
             
             const now = new Date();
@@ -444,11 +473,10 @@
             
             if(timestampEl) {
                 timestampEl.innerHTML = `
-                    <span class="material-symbols-rounded">calendar_today</span> ${dataHoje}
-                    <span style="width: 1px; height: 12px; background: rgba(255,255,255,0.3); margin: 0 5px;"></span>
-                    <span class="material-symbols-rounded">schedule</span> ${horaAgora}
+                    <span class=\"material-symbols-rounded\">calendar_today</span> ${dataHoje}
+                    <span style=\"width: 1px; height: 12px; background: rgba(255,255,255,0.3); margin: 0 5px;\"></span>
+                    <span class=\"material-symbols-rounded\">schedule</span> ${horaAgora}
                 `;
-                
                 timestampEl.classList.remove('updated-anim');
                 void timestampEl.offsetWidth; 
                 timestampEl.classList.add('updated-anim');
@@ -462,19 +490,5 @@
             setInterval(runOverview, REFRESH_INTERVAL_SECONDS * 1000);
         });
     </script>
-    
-    <style>
-        /* Ajuste de responsividade para os Totais do Card Global no Mobile */
-        @media (max-width: 768px) {
-            .global-stat {
-                display: flex !important;
-                flex-direction: column-reverse !important;
-                align-items: flex-start !important;
-                gap: 5px !important;
-                margin-bottom: 12px;
-            }
-        }
-    </style>
-
 </body>
 </html>
