@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energia - Painel de Monitoramento</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">    
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+
+    <style>
+        /* ==========================================
+           ESTILOS ESPECÍFICOS - PAINEL DE ENERGIA
+           ========================================== */
+        
+        /* Único Card Master (Blindado contra sobreposição) */
+        .energy-master-card {
+            display: flex;
+            flex-direction: row;
+            max-width: 100% !important; 
+            width: 100%;
+            margin-bottom: 24px;
+            padding: 0; 
+            overflow: hidden; 
+        }
+
+        .energy-master-left {
+            flex: 0 0 280px; 
+            padding: 20px;
+            border-right: 1px solid rgba(255, 255, 255, 0.15); /* Linha divisória fina e visível */
+            border-left: 5px solid #f87171;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .energy-master-right {
+            flex: 1; 
+            min-width: 0; 
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (max-width: 900px) {
+            .energy-master-card {
+                flex-direction: column; 
+            }
+            .energy-master-left {
+                flex: auto;
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* Linha divisória desce no mobile */
+            }
+        }
+
+        /* Preparação para os novos Cards de OLT gerados pelo JS */
+        .energy-olt-card-header {
+            padding: 8px 16px !important; 
+            border-bottom: 1px solid var(--m3-outline-variant); 
+            background: rgba(234, 208, 255, 0.05);
+        }
+        
+        .btn-energy-details {
+            background: rgba(234, 208, 255, 0.05); 
+            border: none !important; 
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--m3-on-surface); 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-energy-details:hover {
+            background: rgba(234, 208, 255, 0.15); 
+            transform: translateY(-1px);
+        }
+
+        /* Barra de Progresso Tríplice (Cores Básicas Atualizadas) */
+        .triple-progress-bar {
+            height: 8px; 
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            display: flex;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+        .bar-online { background-color: var(--m3-on-surface); } /* Branco/Gelo - Total Offline */
+        .bar-poweroff { background-color: #f87171; } /* Vermelho - Energia */
+        .bar-offline { background-color: var(--m3-color-warning); } /* Amarelo - GPON */
+
+        /* Estilização do Modal de Energia */
+        .placas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .placa-btn {
+            background: var(--m3-surface-container-high);
+            border: 1px solid var(--m3-outline-variant);
+            color: var(--m3-on-surface);
+            padding: 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .placa-btn:hover {
+            background: rgba(248, 113, 113, 0.1);
+            border-color: #f87171;
+        }
+        .placa-btn.has-alarm {
+            border-bottom: 3px solid #f87171;
+        }
+        .placa-btn .alarm-count {
+            font-size: 0.8rem;
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.15);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        /* Botão Voltar no Modal */
+        .btn-voltar-placas {
+            background: transparent;
+            border: 1px solid var(--m3-outline);
+            color: var(--m3-on-surface);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            transition: background 0.2s;
+        }
+        .btn-voltar-placas:hover {
+            background: var(--m3-surface-container-high);
+        }
+
+        /* Status Badges para a Tabela */
+        .impact-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .impact-high { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+        .impact-med { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+        .impact-low { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+        
+        .loading-overlay { padding: 40px; text-align: center; color: var(--m3-on-surface-variant); }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid var(--m3-surface-container-high);
+            border-top: 4px solid var(--m3-primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <div class="page-container">
+        <div id="header-placeholder"></div>
+
+        <main class="main-content" style="flex-direction: column;">
+            
+            <div class="overview-card energy-master-card">
+                
+                <div class="energy-master-left">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                        <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem; font-weight: 600; letter-spacing: 1px;">CLIENTES SEM ENERGIA</span>
+                        <span class="material-symbols-rounded" style="font-size: 28px; color: #f87171; opacity: 0.8;">bolt</span>
+                    </div>
+                    <h2 id="global-poweroff-total" style="font-size: 2.8rem; margin: 0; color: #f87171; line-height: 1;">0</h2>
+                    <div id="global-poweroff-context" style="margin-top: 10px; color: var(--m3-on-surface-variant); font-size: 0.85rem; line-height: 1.4;">
+                        <span class="material-symbols-rounded" style="font-size: 14px; vertical-align: middle;">dns</span> <strong id="global-olts-afetadas" style="color: var(--m3-on-surface);">0</strong> de 17 OLTs afetadas.<br>
+                        <span class="material-symbols-rounded" style="font-size: 14px; vertical-align: middle;">public</span> Impacto rede: <strong id="global-impacto-perc" style="color: var(--m3-on-surface);">0%</strong><br>
+                        <span class="material-symbols-rounded" style="font-size: 14px; vertical-align: middle;">pie_chart</span> Relativo OFF: <strong id="global-offline-relativo-perc" style="color: #f87171;">0%</strong>
+                    </div>
+                </div>
+
+                <div class="energy-master-right">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--m3-outline-variant); padding-bottom: 8px;">
+                        <span class="material-symbols-rounded" style="color: var(--m3-primary); font-size: 20px;">bar_chart</span>
+                        <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Ranking de OLTs Críticas</h3>
+                    </div>
+                    <div style="flex: 1; width: 100%; overflow-x: auto; padding-bottom: 5px;">
+                        <div style="position: relative; min-width: 500px; height: 160px;">
+                            <canvas id="energyChartOlt"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="energy-olt-grid" class="grid-container">
+                <div style="grid-column: 1 / -1; text-align: center; padding: 40px;">
+                    <div class="spinner"></div>
+                    <p style="color: var(--m3-on-surface-variant);">Processando alarmes de Dying Gasp...</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="footer-placeholder"></div>
+
+    <div id="energy-detail-modal" class="modal-overlay" onclick="closeEnergyModal(event)">
+        <div class="modal-content modal-large" style="background-color: var(--m3-surface-container); border: 1px solid var(--m3-outline-variant);">
+            
+            <div class="modal-header" style="border-bottom: 1px solid var(--m3-outline-variant); padding-bottom: 15px; margin-bottom: 15px;">
+                <div>
+                    <h3 id="energy-modal-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                        <span class="material-symbols-rounded">router</span> OLT Selecionada
+                    </h3>
+                    <p id="energy-modal-last-update" style="margin: 5px 0 0 0; font-size: 0.85rem; color: var(--m3-primary); font-family: 'Roboto Mono', monospace; display: flex; align-items: center; gap: 5px;">
+                        <span class="material-symbols-rounded" style="font-size: 14px;">history</span> Última Varredura: --/-- --:--
+                    </p>
+                </div>
+                <button class="close-modal" onclick="closeEnergyModal()" style="color: var(--m3-on-surface);">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                
+                <div id="energy-view-placas">
+                    <p style="margin-bottom: 15px; color: var(--m3-on-surface-variant);">Selecione uma placa para ver os detalhes das portas afetadas:</p>
+                    <div id="energy-placas-list" class="placas-grid">
+                        </div>
+                </div>
+
+                <div id="energy-view-detalhes" style="display: none;">
+                    <button class="btn-voltar-placas" onclick="backToEnergyPlacas()">
+                        <span class="material-symbols-rounded">arrow_back</span> Voltar para Placas
+                    </button>
+                    
+                    <h4 id="energy-placa-subtitle" style="margin-bottom: 15px; color: var(--m3-on-surface); font-size: 1.1rem;">Detalhes - Placa X</h4>
+                    
+                    <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table class="olt-table">
+                            <thead>
+                                <tr>
+                                    <th>Porta</th>
+                                    <th>Circuito (Bairro)</th>
+                                    <th>Total Clientes</th>
+                                    <th style="color: #f87171;">Power Off</th>
+                                    <th>Impacto</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="energy-detalhes-tbody">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="layout.js"></script>
+    <script src="notifications.js"></script>
+    <script src="olt-engine.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHeader({ title: "Alarmes de Energia", exactTitle: true });
+            loadFooter();
+
+            // Injeta a data/hora logo após o cabeçalho ser criado
+            setPageOpenTime();
+
+            if (typeof startEnergyMonitoring === 'function') {
+                startEnergyMonitoring();
+            }
+        });
+
+        // Função formatada exatamente com o padrão visual do layout.js
+        function setPageOpenTime() {
+            let timestampEl = document.getElementById('update-timestamp');
+            
+            if (timestampEl) {
+                const now = new Date();
+                const dataFormatada = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const horaFormatada = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                
+                timestampEl.innerHTML = `
+                    <span class="material-symbols-rounded">calendar_today</span> ${dataFormatada}
+                    <span style="display: inline-block; width: 1px; height: 12px; background: rgba(255,255,255,0.3); margin: 0 5px;"></span>
+                    <span class="material-symbols-rounded">schedule</span> ${horaFormatada}
+                `;
+                timestampEl.style.color = 'var(--m3-on-surface-variant)';
+            }
+        }
+
+        function closeEnergyModal(event) {
+            if (event && event.target.id !== 'energy-detail-modal') return;
+            document.getElementById('energy-detail-modal').style.display = 'none';
+        }
+
+        function backToEnergyPlacas() {
+            document.getElementById('energy-view-detalhes').style.display = 'none';
+            document.getElementById('energy-view-placas').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
