@@ -130,7 +130,6 @@
                 let totalOnline = 0;
                 let totalOffline = 0;
                 const portData = {};
-                const localProblems = new Set(); 
 
                 rows.forEach(columns => {
                     if (columns.length === 0) return;
@@ -170,65 +169,20 @@
                     }
                 });
 
-                // ==========================================
-                // LÓGICA DE ALARMES V3 (TRAVA DE 5 CLIENTES)
-                // ==========================================
-                let isMicroSuper = false;
-                let isCritical = false;     
-                let isWarning = false;
-                let ports100Down = 0;
-                let hasBackbone = false;
-
-                for (const key in portData) {
-                    const { off, total } = portData[key];
-                    if (total === 0) continue; 
-
-                    const percOffline = off / total;
-
-                    // --- TRAVA DE SEGURANÇA: MÍNIMO 5 CLIENTES NA PORTA ---
-                    if (total >= 5) {
-                        // Gatilho de Backbone (Porta 100% OFF)
-                        if (percOffline === 1) {
-                            ports100Down++;
-                            isMicroSuper = true; 
-                        }
-                        // OLTs Padrão
-                        else if (percOffline >= 0.5) {
-                            isMicroSuper = true;
-                        } else if (off >= 32) {
-                            isCritical = true; 
-                        } else if (off >= 16 && off < 32) {
-                            isWarning = true;  
-                        }
-                    }
-                }
-
-                if (ports100Down >= 2) {
-                    hasBackbone = true;
-                } else if (isMicroSuper) {
-                    localProblems.add(`[${olt.id}] STATUS::SUPER`);
-                } else if (isCritical) {
-                    localProblems.add(`[${olt.id}] STATUS::CRIT`);
-                } else if (isWarning) {
-                    localProblems.add(`[${olt.id}] STATUS::WARN`);
-                }
-
                 updateCardUI(olt.id, { onlineCount: totalOnline, offlineCount: totalOffline, type: olt.type });
                 
                 return { 
                     id: olt.id, 
-                    problems: localProblems, 
                     onlineCount: totalOnline, 
                     offlineCount: totalOffline, 
                     type: olt.type,
-                    hasBackbone: hasBackbone,
-                    backboneDetails: hasBackbone ? `OLT: ${olt.id}` : null
+                    portData: portData 
                 };
 
             } catch (error) {
                 console.error(`Erro para OLT ${olt.id}:`, error);
                 updateCardUI(olt.id, { error: true });
-                return { id: olt.id, problems: new Set(), onlineCount: 0, offlineCount: 0, type: olt.type, hasBackbone: false };
+                return { id: olt.id, onlineCount: 0, offlineCount: 0, type: olt.type, portData: {} };
             }
         }
         
@@ -247,7 +201,6 @@
             const header = card.querySelector('.card-header');
             header.classList.remove('status-normal', 'status-atencao', 'status-problema');
             
-            // --- NOVA RÉGUA DE CORES HÍBRIDA (Porcentagem + Absoluto) ---
             if (offlinePercent > 15 || offlineCount >= 300) { 
                 header.classList.add('status-problema'); 
             }
@@ -297,8 +250,6 @@
             if (!card) return;
             
             const header = card.querySelector('.card-header');
-            
-            // GARANTIA: Remove qualquer classe de alerta que possa mudar a cor fixa
             header.classList.remove('status-normal', 'status-atencao', 'status-problema');
             
             const total = globalOnline + globalOffline;
@@ -408,8 +359,14 @@
                 createCardPlaceholders();
             }
             
-            const promises = oltsConfig.map(olt => fetchOltData(olt));
-            const results = await Promise.all(promises);
+            const energyUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/ENERGIA!A:D?key=${API_KEY}`;
+            const oltPromises = oltsConfig.map(olt => fetchOltData(olt));
+            const energyPromise = fetch(energyUrl).then(res => res.json()).catch(() => null);
+            
+            const allResults = await Promise.all([...oltPromises, energyPromise]);
+            
+            const energyDataJson = allResults.pop(); 
+            const results = allResults; 
             
             const allProblems = new Set();
             let globalOnline = 0;
@@ -422,8 +379,61 @@
             let activeBackboneDetails = []; 
             let currentBackbones = new Set(); 
 
+            // =================================================================
+            // 1. PROCESSAMENTO DE ENERGIA (CRIAÇÃO DA LISTA DE BLOQUEIO)
+            // =================================================================
+            let energyProblems = new Set();
+            let portsWithEnergy = new Set();
+            let energyGroups = {}; 
+
+            if (energyDataJson && energyDataJson.values) {
+                const energyRows = energyDataJson.values.slice(1);
+                
+                energyRows.forEach(row => {
+                    const oltId = row[0];
+                    const portaFull = row[1];
+                    const powerOffQtd = parseInt(row[2]) || 0;
+
+                    if (powerOffQtd > 0) {
+                        const oltResult = results.find(r => r.id === oltId);
+                        if (oltResult && oltResult.portData && oltResult.portData[portaFull]) {
+                            const portTotal = oltResult.portData[portaFull].total;
+                            const perc = powerOffQtd / portTotal;
+
+                            let severity = null;
+                            if ((perc >= 0.5 && powerOffQtd >= 10) || (perc === 1 && portTotal >= 5)) {
+                                severity = 'CRIT'; 
+                            } else if (perc >= 0.2 && powerOffQtd >= 5) {
+                                severity = 'WARN'; 
+                            }
+
+                            if (severity) {
+                                // MARCA A PORTA PARA SER SILENCIADA NO STATUS OFFLINE
+                                portsWithEnergy.add(`[${oltId} PORTA ${portaFull}]`);
+                                
+                                // Agrupa os eventos de energia por OLT
+                                if (!energyGroups[oltId]) energyGroups[oltId] = { crit: 0, warn: 0, clientsOff: 0, portsCount: 0 };
+                                energyGroups[oltId].clientsOff += powerOffQtd;
+                                energyGroups[oltId].portsCount++;
+                                if (severity === 'CRIT') energyGroups[oltId].crit++;
+                                else energyGroups[oltId].warn++;
+                            }
+                        }
+                    }
+                });
+
+                // Gera apenas UM aviso de energia por OLT para o vigilante
+                for (const olt in energyGroups) {
+                    const group = energyGroups[olt];
+                    const overallSeverity = group.crit > 0 ? 'CRIT' : 'WARN'; 
+                    energyProblems.add(`[${olt}] ENERGIA::${overallSeverity}::${group.clientsOff}::${group.portsCount}`);
+                }
+            }
+
+            // =================================================================
+            // 2. PROCESSAMENTO DE STATUS E AGRUPAMENTO (COM SUPRESSÃO)
+            // =================================================================
             results.forEach(result => {
-                result.problems.forEach(problem => allProblems.add(problem));
                 globalOnline += result.onlineCount;
                 globalOffline += result.offlineCount;
                 
@@ -438,9 +448,45 @@
 
                 oltStatsList.push({ id: result.id, offline: result.offlineCount, total: oltTotal });
 
-                if (result.hasBackbone) {
-                    activeBackboneDetails.push(result.backboneDetails);
+                let isMicroSuper = false;
+                let isCritical = false;     
+                let isWarning = false;
+                let ports100Down = 0;
+
+                for (const key in result.portData) {
+                    // SUPRESSÃO CIRÚRGICA: Se a porta está na lista de falta de luz, IGNORA o alerta offline!
+                    if (portsWithEnergy.has(`[${result.id} PORTA ${key}]`)) continue;
+
+                    const { off, total } = result.portData[key];
+                    if (total === 0) continue; 
+
+                    const percOffline = off / total;
+
+                    if (total >= 5) {
+                        if (percOffline === 1) {
+                            ports100Down++;
+                            isMicroSuper = true; 
+                        }
+                        else if (percOffline >= 0.5) {
+                            isMicroSuper = true;
+                        } else if (off >= 32) {
+                            isCritical = true; 
+                        } else if (off >= 16 && off < 32) {
+                            isWarning = true;  
+                        }
+                    }
+                }
+
+                // GERA APENAS UM AVISO DE STATUS POR OLT (Restaurando o comportamento antigo)
+                if (ports100Down >= 2) {
+                    activeBackboneDetails.push(`OLT: ${result.id}`);
                     currentBackbones.add(result.id);
+                } else if (isMicroSuper) {
+                    allProblems.add(`[${result.id}] STATUS::SUPER`);
+                } else if (isCritical) {
+                    allProblems.add(`[${result.id}] STATUS::CRIT`);
+                } else if (isWarning) {
+                    allProblems.add(`[${result.id}] STATUS::WARN`);
                 }
             });
 
@@ -466,8 +512,9 @@
                 backboneContainer.innerHTML = '';
             }
 
+            // Envia TUDO (limpo e agrupado) para o notifications.js
             if (typeof checkAndNotifyForNewProblems === 'function') {
-                checkAndNotifyForNewProblems(allProblems, currentBackbones);
+                checkAndNotifyForNewProblems(allProblems, currentBackbones, energyProblems);
             }
             
             const now = new Date();
