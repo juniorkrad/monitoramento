@@ -1,5 +1,5 @@
 // ==============================================================================
-// olt-engine.js - Versão 8.0 (Limpa e Exclusiva para Páginas Individuais)
+// olt-engine.js - Motor Dedicado de Monitoramento de Rede (Individual e Global)
 // ==============================================================================
 
 const ENGINE_API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
@@ -15,11 +15,235 @@ const OLT_COLUMN_MAP = {
     'PQA2':  25, 'PQA3':  27, 'LTXV2': 29, 'LTXV1': 31, 'SBO1':  33
 };
 
+const GLOBAL_OLT_LIST = [
+    { id: 'HEL-1', sheetTab: 'HEL1', type: 'nokia' },
+    { id: 'HEL-2', sheetTab: 'HEL2', type: 'nokia' },
+    { id: 'PQA-1', sheetTab: 'PQA1', type: 'nokia' },
+    { id: 'PSV-1', sheetTab: 'PSV1', type: 'nokia' },
+    { id: 'MGP',   sheetTab: 'MGP',  type: 'nokia' },
+    { id: 'LTXV-1', sheetTab: 'LTXV1', type: 'furukawa-10' }, 
+    { id: 'LTXV-2', sheetTab: 'LTXV2', type: 'furukawa-2' },
+    { id: 'PQA-2',  sheetTab: 'PQA2',  type: 'furukawa-2' },
+    { id: 'PQA-3',  sheetTab: 'PQA3',  type: 'furukawa-2' },
+    { id: 'SB-1',   sheetTab: 'SB1',   type: 'furukawa-2' },
+    { id: 'SB-2',   sheetTab: 'SB2',   type: 'furukawa-2' },
+    { id: 'SB-3',   sheetTab: 'SB3',   type: 'furukawa-2' },
+    { id: 'PSV-7',  sheetTab: 'PSV7',  type: 'furukawa-2' },
+    { id: 'SBO-1',  sheetTab: 'SBO1',  type: 'furukawa-10' },
+    { id: 'SBO-2',  sheetTab: 'SBO2',  type: 'furukawa-2' },
+    { id: 'SBO-3',  sheetTab: 'SBO3',  type: 'furukawa-2' },
+    { id: 'SBO-4',  sheetTab: 'SBO4',  type: 'furukawa-2' }
+];
+
 window.OLT_CLIENTS_DATA = {};
+window.CURRENT_OLT_PORT_DATA = {}; // Cofre de dados estruturado por placa -> porta
+window.NETWORK_PROBLEMS_STORE = new Set();
+window.NETWORK_BACKBONE_STORE = new Set();
+window.currentOltInterval = null; 
 
 // ==============================================================================
-// FUNÇÕES GLOBAIS
+// FUNÇÕES DE VARREDURA DE REDE GLOBAL (PARA A HOME)
 // ==============================================================================
+
+async function fetchGlobalOltData(olt) {
+    const range = olt.type === 'nokia' ? `${olt.sheetTab}!A:E` : `${olt.sheetTab}!A:C`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${ENGINE_SHEET_ID}/values/${range}?key=${ENGINE_API_KEY}`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Falha aba ${olt.sheetTab}`);
+        const data = await response.json();
+        const rows = (data.values || []).slice(1);
+        
+        let totalOnline = 0, totalOffline = 0;
+        const portData = {};
+
+        rows.forEach(columns => {
+            if (columns.length === 0) return;
+            let placa, porta, isOnline;
+
+            if (olt.type === 'nokia') {
+                isOnline = (columns[4] || '').trim().toLowerCase().includes('up');
+                if (columns[0] && columns[0].includes('1/1/')) {
+                    const parts = columns[0].split('/');
+                    if (parts.length >= 4) { placa = parts[2]; porta = parts[3]; }
+                }
+            } else { 
+                isOnline = (columns[2] || '').trim().toLowerCase() === 'active';
+                if (columns[0]) {
+                    if (olt.type === 'furukawa-10') {
+                        const parts = columns[0].split('/');
+                        if (parts.length >= 2) { placa = parts[0]; porta = parts[1]; }
+                    } else { 
+                        const match = columns[0].match(/GPON(\d+)\/(\d+)/);
+                        if (match) { placa = match[1]; porta = match[2]; }
+                    }
+                }
+            }
+
+            if (isOnline) totalOnline++; else totalOffline++;
+            if (placa && porta) {
+                const portKey = `${placa}/${porta}`;
+                if (!portData[portKey]) portData[portKey] = { off: 0, total: 0 };
+                portData[portKey].total++;
+                if (!isOnline) portData[portKey].off++;
+            }
+        });
+
+        return { id: olt.id, onlineCount: totalOnline, offlineCount: totalOffline, type: olt.type, portData };
+    } catch (error) {
+        return { id: olt.id, onlineCount: 0, offlineCount: 0, type: olt.type, portData: {} };
+    }
+}
+
+function updateGlobalNetworkCard(globalOnline, globalOffline, nokiaOnline, nokiaTotal, furukawaOnline, furukawaTotal, top3Olts) {
+    const cardBody = document.querySelector('#card-global .card-body');
+    if (!cardBody) return;
+    
+    const total = globalOnline + globalOffline;
+    
+    const statsHtml = `
+        <div class="stat-item global-stat">
+            <span class="stat-number">${total}</span>
+            <label><span class="material-symbols-rounded icon-total">router</span> Total Geral</label>
+        </div>
+        <div class="stat-item online global-stat">
+            <span class="stat-number">${globalOnline}</span>
+            <label><span class="material-symbols-rounded icon-up">check_circle</span> Equipamentos Online</label>
+        </div>
+        <div class="stat-item offline global-stat">
+            <span class="stat-number">${globalOffline}</span>
+            <label><span class="material-symbols-rounded icon-down">error</span> Equipamentos Offline</label>
+        </div>
+    `;
+
+    const nokiaPct = nokiaTotal > 0 ? (nokiaOnline / nokiaTotal) * 100 : 0;
+    const furukawaPct = furukawaTotal > 0 ? (furukawaOnline / furukawaTotal) * 100 : 0;
+    
+    const vendorHtml = `
+        <div style="display: flex; flex-direction: column; justify-content: center; gap: 25px; width: 100%; height: 100%;">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <img src="imagens/nokia.png" alt="Nokia" style="max-height: 28px; width: auto; object-fit: contain;">
+                    <span class="stat-number" style="font-size: 1.4rem; width: auto;">${Math.round(nokiaPct)}%</span>
+                </div>
+                <div style="height: 14px; background: var(--m3-surface-container-high); border-radius: 7px; overflow: hidden;">
+                    <div style="height: 100%; width: ${nokiaPct}%; background: var(--m3-color-success); border-radius: 7px;"></div>
+                </div>
+            </div>
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <img src="imagens/furukawa.png" alt="Furukawa" style="max-height: 28px; width: auto; object-fit: contain;">
+                    <span class="stat-number" style="font-size: 1.4rem; width: auto;">${Math.round(furukawaPct)}%</span>
+                </div>
+                <div style="height: 14px; background: var(--m3-surface-container-high); border-radius: 7px; overflow: hidden;">
+                    <div style="height: 100%; width: ${furukawaPct}%; background: var(--m3-color-success); border-radius: 7px;"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    let rankingHtmlContent = '';
+    if (top3Olts.some(olt => olt.offline > 0)) {
+        top3Olts.forEach((olt, index) => {
+            if (olt.offline === 0) return;
+            const offlinePct = olt.total > 0 ? (olt.offline / olt.total) * 100 : 0;
+            rankingHtmlContent += `
+                <div style="margin-bottom: 18px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; align-items: baseline;">
+                        <strong style="color: var(--m3-on-surface); font-size: 1.2rem;">${index + 1}º ${olt.id}</strong>
+                        <span class="stat-number" style="font-size: 1.3rem; color: var(--m3-color-error); width: auto;">${olt.offline} OFF</span>
+                    </div>
+                    <div style="height: 12px; background: var(--m3-surface-container-high); border-radius: 6px; overflow: hidden;">
+                        <div style="height: 100%; width: ${offlinePct}%; background: var(--m3-color-error); border-radius: 6px;"></div>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        rankingHtmlContent = `<div style="text-align: center; color: var(--m3-color-success); font-weight: 700; margin-top: 15px; width: 100%;"><span class="material-symbols-rounded" style="font-size: 48px;">sentiment_very_satisfied</span><br>Rede 100% Online!</div>`;
+    }
+
+    cardBody.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: stretch; width: 100%; flex-wrap: wrap; gap: 20px;">
+            <div class="card-stats" style="padding-right: 0; min-width: 200px;">
+                ${statsHtml}
+            </div>
+            <div style="flex: 1; border-left: 1px solid var(--m3-outline); padding-left: 30px; display: flex; flex-direction: column; min-width: 250px;">
+                ${vendorHtml}
+            </div>
+            <div style="flex: 1; border-left: 1px solid var(--m3-outline); padding-left: 30px; display: flex; flex-direction: column; justify-content: center; min-width: 250px;">
+                <div style="display: flex; flex-direction: column; justify-content: center; width: 100%; height: 100%;">
+                    ${rankingHtmlContent}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function runGlobalNetworkOverview() {
+    const oltPromises = GLOBAL_OLT_LIST.map(olt => fetchGlobalOltData(olt));
+    const results = await Promise.all(oltPromises);
+    
+    let globalOnline = 0, globalOffline = 0;
+    let nokiaOnline = 0, nokiaTotal = 0, furukawaOnline = 0, furukawaTotal = 0;
+    let oltStatsList = [], activeBackboneDetails = [], currentBackbones = new Set();
+    let allProblems = new Set();
+
+    results.forEach(result => {
+        globalOnline += result.onlineCount; 
+        globalOffline += result.offlineCount;
+        let total = result.onlineCount + result.offlineCount;
+        
+        if (result.type === 'nokia') { nokiaOnline += result.onlineCount; nokiaTotal += total; }
+        else { furukawaOnline += result.onlineCount; furukawaTotal += total; }
+        
+        oltStatsList.push({ id: result.id, offline: result.offlineCount, total });
+
+        let isMicroSuper = false, isCritical = false, isWarning = false, ports100Down = 0;
+        for (const key in result.portData) {
+            const { off, total: pTotal } = result.portData[key];
+            if (pTotal >= 5) {
+                if (off / pTotal === 1) { ports100Down++; isMicroSuper = true; }
+                else if (off / pTotal >= 0.5) isMicroSuper = true;
+                else if (off >= 32) isCritical = true;
+                else if (off >= 16) isWarning = true;
+            }
+        }
+        
+        if (ports100Down >= 2) { activeBackboneDetails.push(`OLT: ${result.id}`); currentBackbones.add(result.id); }
+        else if (isMicroSuper) allProblems.add(`[${result.id}] STATUS::SUPER`);
+        else if (isCritical) allProblems.add(`[${result.id}] STATUS::CRIT`);
+        else if (isWarning) allProblems.add(`[${result.id}] STATUS::WARN`);
+    });
+
+    oltStatsList.sort((a, b) => b.offline - a.offline);
+    updateGlobalNetworkCard(globalOnline, globalOffline, nokiaOnline, nokiaTotal, furukawaOnline, furukawaTotal, oltStatsList.slice(0, 3));
+
+    const backboneContainer = document.getElementById('backbone-alert-container');
+    if (backboneContainer) {
+        if (activeBackboneDetails.length > 0) {
+            backboneContainer.innerHTML = `<div class="backbone-alert"><span class="material-symbols-rounded">sos</span><div class="backbone-text-container"><p class="backbone-title">Rompimento de Backbone?!</p><p class="backbone-details">${activeBackboneDetails.join('<br>')}</p></div></div>`;
+            backboneContainer.style.display = 'block';
+        } else {
+            backboneContainer.style.display = 'none';
+        }
+    }
+
+    window.NETWORK_PROBLEMS_STORE = allProblems;
+    window.NETWORK_BACKBONE_STORE = currentBackbones;
+}
+
+// ==============================================================================
+// MOTOR DE OLT (SUPER MODAL - FLUXO MD3: PLACAS -> PORTAS)
+// ==============================================================================
+
+window.stopOltMonitoring = function() {
+    if (window.currentOltInterval) {
+        clearInterval(window.currentOltInterval);
+        window.currentOltInterval = null;
+    }
+};
 
 async function fetchCircuitosData() {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${ENGINE_SHEET_ID}/values/${TAB_CIRCUITOS}!A:AK?key=${ENGINE_API_KEY}`;
@@ -31,8 +255,8 @@ async function fetchCircuitosData() {
     } catch (e) { return []; }
 }
 
-function getCircuitInfo(rowsCircuitos, oltId, placa, porta, type) {
-    const colIndex = OLT_COLUMN_MAP[oltId];
+function getCircuitInfo(rowsCircuitos, sheetTab, placa, porta, type) {
+    const colIndex = OLT_COLUMN_MAP[sheetTab];
     if (colIndex === undefined) return "-";
     if (!rowsCircuitos.length) return "-";
 
@@ -50,14 +274,10 @@ function getCircuitInfo(rowsCircuitos, oltId, placa, porta, type) {
     return "-";
 }
 
-// ==============================================================================
-// MOTOR DE MONITORAMENTO DE OLTS (PÁGINAS INDIVIDUAIS)
-// ==============================================================================
+window.startOltMonitoring = function(config) {
+    window.stopOltMonitoring(); 
 
-function startOltMonitoring(config) {
-    const container = document.querySelector('.grid-container');
-    if (!container) return;
-
+    // Cria o Modal de Detalhes (Clientes/Status) flutuante por cima de tudo
     if (!document.getElementById('detail-modal')) {
         const modalStyles = `
             <style>
@@ -71,7 +291,7 @@ function startOltMonitoring(config) {
                 .client-table tr:hover { background-color: #f1f1f1; }
                 .modal-section-title { font-size: 1.1rem; margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 5px; }
                 
-                .modal-content { background-color: #2f0e51; color: #EADDFF; border: 1px solid #5c4e72; }
+                #detail-modal .modal-content { background-color: #2f0e51; color: #EADDFF; border: 1px solid #5c4e72; }
                 .client-table th { background-color: #3a1c63; color: #fff; }
                 .client-table td { color: #EADDFF; border-bottom: 1px solid #5c4e72; }
                 .client-table tr:nth-child(even) { background-color: rgba(0,0,0,0.2); }
@@ -83,12 +303,15 @@ function startOltMonitoring(config) {
                 
                 .modal-view-stats { display: flex; }
                 .modal-view-clients { display: none; }
+                
+                .status-critico { background-color: #000; color: #FF1744; border: 1px solid #FF1744; animation: pulseRed 1s infinite; }
+                @keyframes pulseRed { 0% { box-shadow: 0 0 0 rgba(255,23,68,0); } 50% { box-shadow: 0 0 10px rgba(255,23,68,0.8); } 100% { box-shadow: 0 0 0 rgba(255,23,68,0); } }
             </style>
         `;
 
         const modalHTML = `
             ${modalStyles}
-            <div id="detail-modal" class="modal-overlay" onclick="closeModal(event)">
+            <div id="detail-modal" class="modal-overlay" style="z-index: 3000;" onclick="closeModal(event)">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3 id="modal-title">Detalhes</h3>
@@ -118,7 +341,7 @@ function startOltMonitoring(config) {
                                 <input type="text" id="search-input" class="filter-input" placeholder="Buscar (Nome, Serial...)" onkeyup="filterClients()">
                                 <select id="status-filter" class="filter-select" onchange="filterClients()"></select>
                             </div>
-                            <div class="client-table-container">
+                            <div class="client-table-container custom-scroll">
                                 <table class="client-table" id="table-clients">
                                     <thead id="clients-thead"></thead>
                                     <tbody id="clients-tbody"></tbody>
@@ -132,45 +355,18 @@ function startOltMonitoring(config) {
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     }
 
-    function createTableStructure() {
-        container.innerHTML = ''; 
-        for (let i = 1; i <= config.boards; i++) {
-            const placaId = i.toString().padStart(2, '0');
-            const colunasBase = '<th>Porta</th>'; 
-            const colunasFinais = `<th>${TABLE_HEADER_NAME}</th><th>Status</th>`;
-
-            container.innerHTML += `
-                <table>
-                    <thead>
-                        <tr class="table-title-row"><th colspan="3">PLACA ${placaId}</th></tr>
-                        <tr class="table-header-row">${colunasBase}${colunasFinais}</tr>
-                    </thead>
-                    <tbody id="tbody-placa-${i}"></tbody>
-                </table>
-            `;
-        }
-    }
-
     async function populateTables() {
+        window.CURRENT_OLT_PORT_DATA = {}; 
         window.OLT_CLIENTS_DATA = {}; 
-
-        for (let i = 1; i <= config.boards; i++) {
-            const tbody = document.getElementById(`tbody-placa-${i}`);
-            if (tbody) tbody.innerHTML = '';
-        }
 
         const rangeOlt = `${config.id}!A:I`; 
         const urlOlt = `https://sheets.googleapis.com/v4/spreadsheets/${ENGINE_SHEET_ID}/values/${rangeOlt}?key=${ENGINE_API_KEY}`;
 
         try {
             const [responseOlt, rowsCircuitos] = await Promise.all([fetch(urlOlt), fetchCircuitosData()]);
-            if (!responseOlt.ok) throw new Error('Falha API');
+            if (!responseOlt.ok) throw new Error('Falha API OLT');
             const dataOlt = await responseOlt.json();
             const rowsOlt = (dataOlt.values || []).slice(1);
-            
-            const portData = {};
-            const boardStats = {}; 
-            const newProblems = new Set(); 
 
             rowsOlt.forEach(columns => {
                 if (columns.length === 0) return;
@@ -199,22 +395,24 @@ function startOltMonitoring(config) {
                 }
 
                 if (!placa || !porta) return;
-                const portKey = `${placa}/${porta}`;
                 
-                if (!portData[portKey]) {
+                const placaNum = parseInt(placa);
+                const portaNum = parseInt(porta);
+                const portKey = `${placaNum}/${portaNum}`;
+                
+                if (!window.CURRENT_OLT_PORT_DATA[placaNum]) {
+                    window.CURRENT_OLT_PORT_DATA[placaNum] = {};
+                }
+
+                if (!window.CURRENT_OLT_PORT_DATA[placaNum][portaNum]) {
                     const infoExtra = getCircuitInfo(rowsCircuitos, config.id, placa, porta, config.type);
-                    portData[portKey] = { online: 0, offline: 0, info: infoExtra };
+                    window.CURRENT_OLT_PORT_DATA[placaNum][portaNum] = { online: 0, offline: 0, info: infoExtra };
                     window.OLT_CLIENTS_DATA[portKey] = [];
                 }
 
-                if (!boardStats[placa]) boardStats[placa] = { total: 0, offline: 0 };
-
-                if (isOnline) portData[portKey].online++;
-                else portData[portKey].offline++;
+                if (isOnline) window.CURRENT_OLT_PORT_DATA[placaNum][portaNum].online++;
+                else window.CURRENT_OLT_PORT_DATA[placaNum][portaNum].offline++;
                 
-                boardStats[placa].total++;
-                if (!isOnline) boardStats[placa].offline++;
-
                 let clientData = {};
                 if (config.type === 'nokia') {
                     clientData = { colB: columns[1] || '', colC: columns[2] || '', colE: columns[4] || '', colH: columns[7] || '', colI: columns[8] || '', statusRef: columns[4] || '' };
@@ -225,92 +423,150 @@ function startOltMonitoring(config) {
                 window.OLT_CLIENTS_DATA[portKey].push(clientData);
             });
 
-            for (const placa in boardStats) {
-                const bStat = boardStats[placa];
-                if (bStat.total >= 5 && bStat.offline === bStat.total) {
-                    newProblems.add(`[${config.id} PLACA ${placa}] FALHA::SUPER`);
-                }
-            }
+            // ==========================================
+            // RENDERIZA A TELA A (GRID DE PLACAS)
+            // ==========================================
+            const placasList = document.getElementById('olt-placas-list');
+            if (placasList) placasList.innerHTML = '';
 
-            for (const portKey in portData) {
-                const [placa, porta] = portKey.split('/');
-                const { online, offline, info } = portData[portKey];
-                const total = online + offline;
+            for (let i = 1; i <= config.boards; i++) {
+                const placaNum = i;
+                const ports = window.CURRENT_OLT_PORT_DATA[placaNum] || {};
                 
-                let statusClass = 'status-normal';
-                let statusText = 'Normal';
-                let alertTag = '::NORMAL';
+                let hasCritical = false;
+                let hasWarning = false;
+                let alarmCount = 0;
 
-                const percOffline = total > 0 ? (offline / total) : 0;
-
-                if (total >= 5) {
-                    if (percOffline === 1) {
-                        statusClass = 'status-critico'; 
-                        statusText = 'Crítico';
-                        alertTag = '::SUPER';
-                    } else if (percOffline >= 0.5 || offline >= 32) {
-                        statusClass = 'status-problema'; 
-                        statusText = 'Problema';
-                        alertTag = '::CRIT';
-                    } else if (offline >= 16) {
-                        statusClass = 'status-atencao';
-                        statusText = 'Atenção';
-                        alertTag = '::WARN';
+                for (const pt in ports) {
+                    const p = ports[pt];
+                    const total = p.online + p.offline;
+                    const percOffline = total > 0 ? (p.offline / total) : 0;
+                    
+                    if (total >= 5) {
+                        if (percOffline === 1 || percOffline >= 0.5 || p.offline >= 32) {
+                            hasCritical = true;
+                            alarmCount++;
+                        } else if (p.offline >= 16) {
+                            hasWarning = true;
+                        }
                     }
-                } else {
-                    statusClass = 'status-normal';
-                    statusText = 'Normal';
-                    alertTag = '::NORMAL';
                 }
 
-                if (alertTag !== '::NORMAL') newProblems.add(`[${config.id} PORTA ${porta}] ${alertTag}`);
+                let btnClass = 'placa-btn';
+                let badgeHtml = '';
+                if (hasCritical) {
+                    btnClass += ' has-alarm';
+                    badgeHtml = `<span class="alarm-count critico">${alarmCount} crítico(s)</span>`;
+                } else if (hasWarning) {
+                    btnClass += ' has-warning';
+                    badgeHtml = `<span class="alarm-count atencao">Atenção</span>`;
+                }
 
-                const htmlRow = `
-                    <tr>
-                        <td>Porta ${porta.padStart(2, '0')}</td>
-                        <td>
-                            <span class="circuit-badge circuit-clickable" 
-                                  onclick="openCircuitClients('${placa}', '${porta}', '${info}', '${config.type}')"
-                                  title="Ver clientes deste circuito">
-                                ${info}
-                            </span>
-                        </td>
-                        <td>
-                            <button class="status ${statusClass} status-btn" 
-                                onclick="openPortDetails('${placa}', '${porta}', '${info}', ${online}, ${offline}, ${total})">
-                                ${statusText}
-                            </button>
-                        </td>
-                    </tr>
-                `;
-
-                const targetTbody = document.getElementById(`tbody-placa-${placa}`);
-                if (targetTbody) targetTbody.innerHTML += htmlRow;
+                if (placasList) {
+                    placasList.innerHTML += `
+                        <button class="${btnClass}" onclick="openOltPlacaDetails('${placaNum}', '${config.type}')">
+                            <span class="material-symbols-rounded" style="font-size: 32px;">developer_board</span>
+                            Placa ${placaNum}
+                            ${badgeHtml}
+                        </button>
+                    `;
+                }
             }
 
-            if (typeof checkAndNotifyForNewProblems === 'function') checkAndNotifyForNewProblems(newProblems);
+            // ==========================================
+            // ATUALIZA A TELA B (SE ESTIVER ABERTA)
+            // ==========================================
+            const detalhesView = document.getElementById('olt-view-detalhes');
+            if (detalhesView && detalhesView.style.display === 'block') {
+                const subtitle = document.getElementById('olt-placa-subtitle').innerText;
+                const match = subtitle.match(/Placa (\d+)/);
+                if (match) {
+                    window.openOltPlacaDetails(match[1], config.type);
+                }
+            }
 
-        } catch (error) { console.error('Erro na engine:', error); }
+        } catch (error) { 
+            console.error('Erro na engine (populateTables):', error); 
+            const placasList = document.getElementById('olt-placas-list');
+            if (placasList) placasList.innerHTML = `<p style="color: #f87171; text-align: center; padding: 20px; grid-column: 1 / -1;">Erro ao carregar os dados da OLT. Verifique a conexão.</p>`;
+        }
     }
 
-    async function updateTime() {
-        if (typeof loadTimestamp === 'function') await loadTimestamp(config.id, ENGINE_API_KEY, ENGINE_SHEET_ID);
-    }
-
-    createTableStructure();
-    const runUpdate = () => { populateTables(); updateTime(); };
+    const runUpdate = async () => { await populateTables(); };
     runUpdate(); 
-    setInterval(runUpdate, ENGINE_REFRESH_SECONDS * 1000); 
+    window.currentOltInterval = setInterval(runUpdate, ENGINE_REFRESH_SECONDS * 1000); 
 }
 
-function closeModal(event) {
-    if (event && event.target.id !== 'detail-modal') return;
-    document.getElementById('detail-modal').style.display = 'none';
-}
+// ==============================================================================
+// GERAÇÃO DINÂMICA DA TELA B (TABELA DE PORTAS DA PLACA)
+// ==============================================================================
 
-function openPortDetails(placa, porta, circuito, online, offline, total) {
+window.openOltPlacaDetails = function(placa, oltType) {
+    document.getElementById('olt-view-placas').style.display = 'none';
+    document.getElementById('olt-view-detalhes').style.display = 'block';
+    document.getElementById('olt-placa-subtitle').innerText = `Detalhes - Placa ${placa}`;
+    
+    const tbody = document.getElementById('olt-detalhes-tbody');
+    tbody.innerHTML = '';
+    
+    const ports = window.CURRENT_OLT_PORT_DATA[placa] || {};
+    const sortedPorts = Object.keys(ports).sort((a, b) => parseInt(a) - parseInt(b));
+    
+    if (sortedPorts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding: 20px; color: var(--m3-on-surface-variant);">Nenhuma porta ativa com clientes encontrada nesta placa.</td></tr>`;
+        return;
+    }
+
+    sortedPorts.forEach(pt => {
+        const { online, offline, info } = ports[pt];
+        const total = online + offline;
+        
+        let statusClass = 'status-normal';
+        let statusText = 'Normal';
+        const percOffline = total > 0 ? (offline / total) : 0;
+
+        if (total >= 5) {
+            if (percOffline === 1) { statusClass = 'status-critico'; statusText = 'Crítico'; }
+            else if (percOffline >= 0.5 || offline >= 32) { statusClass = 'status-problema'; statusText = 'Problema'; }
+            else if (offline >= 16) { statusClass = 'status-atencao'; statusText = 'Atenção'; }
+        }
+
+        const safeInfo = info.replace(/'/g, "\\'");
+
+        tbody.innerHTML += `
+            <tr>
+                <td>Porta ${String(pt).padStart(2, '0')}</td>
+                <td>
+                    <span class="circuit-badge circuit-clickable" 
+                          onclick="openCircuitClients('${placa}', '${pt}', '${safeInfo}', '${oltType}')"
+                          title="Ver clientes deste circuito">
+                        ${info}
+                    </span>
+                </td>
+                <td>
+                    <button class="status ${statusClass} status-btn" style="border: none; cursor: pointer;"
+                        onclick="openPortDetails('${placa}', '${pt}', '${safeInfo}', ${online}, ${offline}, ${total})">
+                        ${statusText}
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+};
+
+// ==============================================================================
+// CONTROLE DO MODAL INTERNO (CLIENTES E ESTATÍSTICAS)
+// ==============================================================================
+
+window.closeModal = function(event) {
+    if (event && event.target.id !== 'detail-modal' && !event.target.classList.contains('close-modal')) return;
     const modal = document.getElementById('detail-modal');
-    const modalContent = document.querySelector('.modal-content');
+    if (modal) modal.style.display = 'none';
+}
+
+window.openPortDetails = function(placa, porta, circuito, online, offline, total) {
+    const modal = document.getElementById('detail-modal');
+    const modalContent = document.querySelector('#detail-modal .modal-content');
     modalContent.classList.remove('modal-large'); 
     modalContent.classList.add('modal-status');   
 
@@ -324,14 +580,11 @@ function openPortDetails(placa, porta, circuito, online, offline, total) {
     modal.style.display = 'flex';
 }
 
-window.CURRENT_MODAL_TYPE = '';
-
-function openCircuitClients(placa, porta, circuitoNome, oltType) {
+window.openCircuitClients = function(placa, porta, circuitoNome, oltType) {
     const modal = document.getElementById('detail-modal');
-    const modalContent = document.querySelector('.modal-content');
+    const modalContent = document.querySelector('#detail-modal .modal-content');
     modalContent.classList.remove('modal-status'); 
     modalContent.classList.add('modal-large');     
-    window.CURRENT_MODAL_TYPE = oltType; 
 
     const tableObj = document.getElementById('table-clients');
     tableObj.className = 'client-table ' + (oltType === 'nokia' ? 'mode-nokia' : 'mode-furukawa');
@@ -352,13 +605,20 @@ function openCircuitClients(placa, porta, circuitoNome, oltType) {
 
     const thead = document.getElementById('clients-thead');
     const tbody = document.getElementById('clients-tbody');
-    thead.innerHTML = ''; tbody.innerHTML = '';
+    
+    if (oltType === 'nokia') {
+        thead.innerHTML = `<tr><th>Posição/Serial</th><th>Tipo/Perfil</th><th>Status</th><th>Descrição 1</th><th>Descrição 2</th></tr>`;
+    } else {
+        thead.innerHTML = `<tr><th>Posição</th><th>Status</th><th>Serial</th><th>Descrição</th></tr>`;
+    }
+    
+    tbody.innerHTML = '';
 
     const portKey = `${placa}/${porta}`;
     const clients = window.OLT_CLIENTS_DATA[portKey] || [];
 
     if (clients.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Nenhum cliente encontrado.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${oltType === 'nokia' ? 5 : 4}" style="text-align:center;">Nenhum cliente encontrado.</td></tr>`;
     } else {
         clients.forEach(c => {
             let statusRaw = c.statusRef.toLowerCase();
@@ -370,6 +630,7 @@ function openCircuitClients(placa, porta, circuitoNome, oltType) {
                 if (statusRaw.includes('active') && !statusRaw.includes('inactive')) statusClass = 'filter-online';
                 else if (statusRaw.includes('inactive')) statusClass = 'filter-offline';
             }
+            
             let rowHTML = '';
             if (oltType === 'nokia') {
                 rowHTML = `<tr class="client-row ${statusClass}"><td>${c.colB}</td><td>${c.colC}</td><td>${c.colE}</td><td>${c.colH}</td><td>${c.colI}</td></tr>`;
@@ -382,7 +643,7 @@ function openCircuitClients(placa, porta, circuitoNome, oltType) {
     modal.style.display = 'flex';
 }
 
-function filterClients() {
+window.filterClients = function() {
     const searchText = document.getElementById('search-input').value.toLowerCase();
     const statusFilter = document.getElementById('status-filter').value;
     const rows = document.querySelectorAll('.client-row');
@@ -398,3 +659,12 @@ function filterClients() {
         else row.style.display = 'none';
     });
 }
+
+// Inicializador Automático para a Home
+document.addEventListener('DOMContentLoaded', () => {
+    const isHomePage = window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html');
+    if (isHomePage) {
+        runGlobalNetworkOverview();
+        setInterval(runGlobalNetworkOverview, ENGINE_REFRESH_SECONDS * 1000);
+    }
+});
