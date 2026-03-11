@@ -1,5 +1,6 @@
 // ==============================================================================
 // olt-engine.js - Motor Dedicado de Monitoramento de Rede (Individual e Global)
+// Atualização: Fonte de dados limpa para Múltiplas Portas (Minimalista)
 // ==============================================================================
 
 const ENGINE_API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
@@ -36,7 +37,7 @@ const GLOBAL_OLT_LIST = [
 ];
 
 window.OLT_CLIENTS_DATA = {};
-window.CURRENT_OLT_PORT_DATA = {}; // Cofre de dados estruturado por placa -> porta
+window.CURRENT_OLT_PORT_DATA = {}; 
 window.NETWORK_PROBLEMS_STORE = new Set();
 window.NETWORK_BACKBONE_STORE = new Set();
 window.currentOltInterval = null; 
@@ -187,7 +188,7 @@ async function runGlobalNetworkOverview() {
     
     let globalOnline = 0, globalOffline = 0;
     let nokiaOnline = 0, nokiaTotal = 0, furukawaOnline = 0, furukawaTotal = 0;
-    let oltStatsList = [], activeBackboneDetails = [], currentBackbones = new Set();
+    let oltStatsList = [], currentBackbones = new Set();
     let allProblems = new Set();
 
     results.forEach(result => {
@@ -200,35 +201,54 @@ async function runGlobalNetworkOverview() {
         
         oltStatsList.push({ id: result.id, offline: result.offlineCount, total });
 
-        let isMicroSuper = false, isCritical = false, isWarning = false, ports100Down = 0;
+        let ports100Down = 0;
+        let localProblems = []; 
+        
         for (const key in result.portData) {
             const { off, total: pTotal } = result.portData[key];
             if (pTotal >= 5) {
-                if (off / pTotal === 1) { ports100Down++; isMicroSuper = true; }
-                else if (off / pTotal >= 0.5) isMicroSuper = true;
-                else if (off >= 32) isCritical = true;
-                else if (off >= 16) isWarning = true;
+                let severity = null;
+                const percOffline = off / pTotal;
+
+                if (percOffline === 1) { 
+                    ports100Down++; 
+                    severity = 'SUPER'; 
+                } else if (percOffline >= 0.5 || off >= 32) { 
+                    severity = 'CRIT'; 
+                } else if (off >= 16) { 
+                    severity = 'WARN'; 
+                }
+
+                if (severity) {
+                    localProblems.push({ porta: key, severity: severity, off: off });
+                }
             }
         }
         
-        if (ports100Down >= 2) { activeBackboneDetails.push(`OLT: ${result.id}`); currentBackbones.add(result.id); }
-        else if (isMicroSuper) allProblems.add(`[${result.id}] STATUS::SUPER`);
-        else if (isCritical) allProblems.add(`[${result.id}] STATUS::CRIT`);
-        else if (isWarning) allProblems.add(`[${result.id}] STATUS::WARN`);
+        // --- LÓGICA DO SILENCIADOR DE BACKBONE E AGRUPADOR MULTI-PORTAS ---
+        let filteredProblems = localProblems;
+        
+        if (ports100Down >= 2) { 
+            currentBackbones.add(result.id); 
+            // Se for Backbone, silencia os críticos absolutos (SUPER) para não poluir
+            filteredProblems = localProblems.filter(p => p.severity !== 'SUPER');
+        } 
+
+        // Se houver 2 ou mais portas restantes com problema (Atenção/Problema), unifica tudo num só card
+        if (filteredProblems.length >= 2) {
+            // AQUI ESTÁ A MUDANÇA: Envia apenas as portas limpas, sem as severidades ao lado
+            const multiStr = filteredProblems.map(p => p.porta).join(',');
+            allProblems.add(`[${result.id}] STATUS::MULTI::${multiStr}`);
+        } 
+        // Se houver apenas 1 porta com problema, mantém o alarme individual
+        else if (filteredProblems.length === 1) {
+            const p = filteredProblems[0];
+            allProblems.add(`[${result.id}] STATUS::${p.severity}_${p.porta}::${p.off}`);
+        }
     });
 
     oltStatsList.sort((a, b) => b.offline - a.offline);
     updateGlobalNetworkCard(globalOnline, globalOffline, nokiaOnline, nokiaTotal, furukawaOnline, furukawaTotal, oltStatsList.slice(0, 3));
-
-    const backboneContainer = document.getElementById('backbone-alert-container');
-    if (backboneContainer) {
-        if (activeBackboneDetails.length > 0) {
-            backboneContainer.innerHTML = `<div class="backbone-alert"><span class="material-symbols-rounded">sos</span><div class="backbone-text-container"><p class="backbone-title">Rompimento de Backbone?!</p><p class="backbone-details">${activeBackboneDetails.join('<br>')}</p></div></div>`;
-            backboneContainer.style.display = 'block';
-        } else {
-            backboneContainer.style.display = 'none';
-        }
-    }
 
     window.NETWORK_PROBLEMS_STORE = allProblems;
     window.NETWORK_BACKBONE_STORE = currentBackbones;
@@ -277,7 +297,6 @@ function getCircuitInfo(rowsCircuitos, sheetTab, placa, porta, type) {
 window.startOltMonitoring = function(config) {
     window.stopOltMonitoring(); 
 
-    // Cria o Modal de Detalhes (Clientes/Status) flutuante por cima de tudo
     if (!document.getElementById('detail-modal')) {
         const modalStyles = `
             <style>
@@ -423,9 +442,7 @@ window.startOltMonitoring = function(config) {
                 window.OLT_CLIENTS_DATA[portKey].push(clientData);
             });
 
-            // ==========================================
-            // RENDERIZA A TELA A (GRID DE PLACAS)
-            // ==========================================
+            // Renderização Tela A
             const placasList = document.getElementById('olt-placas-list');
             if (placasList) placasList.innerHTML = '';
 
@@ -473,9 +490,7 @@ window.startOltMonitoring = function(config) {
                 }
             }
 
-            // ==========================================
-            // ATUALIZA A TELA B (SE ESTIVER ABERTA)
-            // ==========================================
+            // Atualização Tela B
             const detalhesView = document.getElementById('olt-view-detalhes');
             if (detalhesView && detalhesView.style.display === 'block') {
                 const subtitle = document.getElementById('olt-placa-subtitle').innerText;
@@ -496,10 +511,6 @@ window.startOltMonitoring = function(config) {
     runUpdate(); 
     window.currentOltInterval = setInterval(runUpdate, ENGINE_REFRESH_SECONDS * 1000); 
 }
-
-// ==============================================================================
-// GERAÇÃO DINÂMICA DA TELA B (TABELA DE PORTAS DA PLACA)
-// ==============================================================================
 
 window.openOltPlacaDetails = function(placa, oltType) {
     document.getElementById('olt-view-placas').style.display = 'none';
@@ -553,10 +564,6 @@ window.openOltPlacaDetails = function(placa, oltType) {
         `;
     });
 };
-
-// ==============================================================================
-// CONTROLE DO MODAL INTERNO (CLIENTES E ESTATÍSTICAS)
-// ==============================================================================
 
 window.closeModal = function(event) {
     if (event && event.target.id !== 'detail-modal' && !event.target.classList.contains('close-modal')) return;
@@ -660,7 +667,6 @@ window.filterClients = function() {
     });
 }
 
-// Inicializador Automático para a Home
 document.addEventListener('DOMContentLoaded', () => {
     const isHomePage = window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html');
     if (isHomePage) {

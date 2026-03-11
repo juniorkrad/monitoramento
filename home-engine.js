@@ -1,19 +1,30 @@
 /* ==========================================================================
    home-engine.js - Controlador Geral e Vigilante de Alarmes (Home)
-   Ajuste: Porcentagem de Energia reduzida para 15%
+   Atualização: Hierarquia de Força (Múltiplo de Energia anula o Híbrido)
    ========================================================================== */
 
 let lastNotifiedState = ""; // Memória unificada para não spammar os alarmes
 
 function watchHomeAlarms() {
-    // Busca os dados dos cofres de rede que o olt-engine.js guardou
+    // Busca os dados dos cofres de rede e energia gerados pelos motores
     let networkProblems = new Set(window.NETWORK_PROBLEMS_STORE || []);
     let backboneProblems = new Set(window.NETWORK_BACKBONE_STORE || []);
-    let energyProblems = new Set();
-    let energyGroups = {}; 
+    let energyProblems = new Set(window.NETWORK_ENERGY_STORE || []); // Lê a energia unificada
+    let hybridProblems = new Set(); 
 
     // ============================================================
-    // 1. VIGILANTE DE ENERGIA (Atualiza Card da Home e Toasts)
+    // 1. IDENTIFICAR OLTS COM ALARME MÚLTIPLO DE ENERGIA
+    // ============================================================
+    let multiEnergyOlts = new Set();
+    for (const ep of energyProblems) {
+        const match = ep.match(/^\[(.*?)\] ENERGIA::MULTI::/);
+        if (match) {
+            multiEnergyOlts.add(match[1]); // Guarda o nome da OLT que tem 2+ portas sem luz
+        }
+    }
+
+    // ============================================================
+    // 2. VIGILANTE DE ENERGIA E MOTOR HÍBRIDO
     // ============================================================
     if (window.ENERGY_DATA_STORE && window.ENERGY_DATA_STORE.global) {
         const globalData = window.ENERGY_DATA_STORE.global;
@@ -46,76 +57,44 @@ function watchHomeAlarms() {
         }
 
         // ============================================================
-        // 1.2 PREPARAÇÃO DOS TOASTS DE EMERGÊNCIA (ENERGIA)
+        // 2.2 CRIAÇÃO DO ALARME HÍBRIDO (COM TRAVA DE HIERARQUIA)
         // ============================================================
         for (const oltId in window.ENERGY_DATA_STORE.olts) {
+            // TRAVA DE OURO: Se a OLT já tem um Alarme Múltiplo de Energia, aborta o Híbrido para ela!
+            if (multiEnergyOlts.has(oltId)) continue; 
+
             const oltData = window.ENERGY_DATA_STORE.olts[oltId];
             for (const placa in oltData.ports) {
                 for (const porta in oltData.ports[placa]) {
                     const pData = oltData.ports[placa][porta];
-                    if (pData.powerOff > 0 && pData.total > 0) {
-                        const perc = pData.powerOff / pData.total;
-                        let severity = null;
-                        
-                        // --- NOVA REGRA DE NEGÓCIO: ENERGIA ---
-                        // CRIT: 50% de queda e min 10 clientes OU 100% de queda (min 5 clientes)
-                        if ((perc >= 0.5 && pData.powerOff >= 10) || (perc === 1 && pData.total >= 5)) {
-                            severity = 'CRIT';
-                        } 
-                        // WARN: Ajustado para 15% de queda e mínimo de 5 clientes
-                        else if (perc >= 0.15 && pData.powerOff >= 5) {
-                            severity = 'WARN';
-                        }
-                        
-                        if (severity) {
-                            if (!energyGroups[oltId]) energyGroups[oltId] = { crit: 0, warn: 0, clientsOff: 0, portsCount: 0 };
-                            energyGroups[oltId].clientsOff += pData.powerOff;
-                            energyGroups[oltId].portsCount++;
-                            if (severity === 'CRIT') energyGroups[oltId].crit++; else energyGroups[oltId].warn++;
+                    const pt = `${placa}/${porta}`;
+
+                    // Gatilho: Mínimo de 16 offline E Energia representa >= 70% do problema
+                    if (pData.offline >= 16 && pData.powerOff > 0) {
+                        const overlap = pData.powerOff / pData.offline;
+                        if (overlap >= 0.70) {
+                            hybridProblems.add(`[${oltId}] HIBRIDO::${pt}::${pData.offline}::${pData.powerOff}`);
                         }
                     }
                 }
             }
         }
-
-        // Constrói as etiquetas de alerta
-        for (const olt in energyGroups) {
-            const tag = `[${olt}] ENERGIA::${energyGroups[olt].crit > 0 ? 'CRIT' : 'WARN'}::${energyGroups[olt].clientsOff}::${energyGroups[olt].portsCount}`;
-            energyProblems.add(tag);
-        }
     }
 
     // ============================================================
-    // 1.3 FILTRO DE PREVALÊNCIA (ENERGIA > REDE)
-    // ============================================================
-    let filteredNetworkProblems = new Set();
-    for (const netProb of networkProblems) {
-        const match = netProb.match(/^\[(.*?)\] STATUS::/);
-        if (match) {
-            const oltId = match[1];
-            // Se NÃO tem problema de energia nessa OLT, mantém o alarme de rede
-            if (!energyGroups[oltId]) {
-                filteredNetworkProblems.add(netProb);
-            }
-        } else {
-            filteredNetworkProblems.add(netProb);
-        }
-    }
-    networkProblems = filteredNetworkProblems; 
-
-    // ============================================================
-    // 2. DISPARO CENTRALIZADO DE TODOS OS ALARMES
+    // 3. DISPARO CENTRALIZADO DE TODOS OS ALARMES
     // ============================================================
     const currentStateStr = 
         Array.from(networkProblems).sort().join('|') + "||" + 
         Array.from(backboneProblems).sort().join('|') + "||" + 
-        Array.from(energyProblems).sort().join('|');
+        Array.from(energyProblems).sort().join('|') + "||" + 
+        Array.from(hybridProblems).sort().join('|');
 
     if (currentStateStr !== lastNotifiedState) {
         lastNotifiedState = currentStateStr;
         
         if (typeof checkAndNotifyForNewProblems === 'function') {
-            checkAndNotifyForNewProblems(networkProblems, backboneProblems, energyProblems);
+            checkAndNotifyForNewProblems(networkProblems, backboneProblems, energyProblems, hybridProblems);
         }
     }
 }
