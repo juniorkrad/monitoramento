@@ -261,10 +261,10 @@ async function runPotenciaEngine() {
                 let statusColor = olt.criticos > 0 ? '#f87171' : 'var(--m3-color-success)';
 
                 gridEl.innerHTML += `
-                    <div class="potencia-olt-card overview-card" style="display: flex; flex-direction: column;">
-                        <div class="potencia-olt-card-header">
+                    <div class="overview-card" style="display: flex; flex-direction: column;">
+                        <div class="card-header">
                             <h3><span class="material-symbols-rounded">dns</span> ${olt.id}</h3>
-                            <button class="btn-potencia-details" onclick="window.abrirModalPotencia('${olt.id}')" title="Ver Detalhes">
+                            <button class="card-header-button" onclick="window.abrirModalPotencia('${olt.id}')" title="Ver Detalhes">
                                 <span class="material-symbols-rounded" style="font-size: 22px;">manage_search</span>
                             </button>
                         </div>
@@ -307,7 +307,7 @@ async function runPotenciaEngine() {
 }
 
 // ==============================================================================
-// CONTROLE DO MODAL DE CLIENTES (OTIMIZADO)
+// CONTROLE DO MODAL DE CLIENTES (OTIMIZADO E PADRONIZADO)
 // ==============================================================================
 
 window.abrirModalPotencia = function(oltId) {
@@ -316,17 +316,30 @@ window.abrirModalPotencia = function(oltId) {
 
     const tbody = document.getElementById('potencia-tbody');
     const title = document.getElementById('modal-potencia-title');
-    const lastUpdateEl = document.getElementById('modal-potencia-last-update');
     const searchInput = document.getElementById('potencia-search');
     
     if (searchInput) searchInput.value = '';
-    if (title) title.innerHTML = `<span class="material-symbols-rounded">sensors</span> Preventiva - ${oltId}`;
     
-    // Injeta a data de varredura coletada no cofre
-    const dataDaOlt = window.POTENCIA_LAST_UPDATES[oltId] || '--/-- --:--';
-    if (lastUpdateEl) {
-        lastUpdateEl.innerHTML = `<span class="material-symbols-rounded" style="font-size: 16px;">history</span> Varredura: ${dataDaOlt}`;
+    // Título padronizado: Ícone DNS e apenas o nome da OLT
+    if (title) title.innerHTML = `<span class="material-symbols-rounded">dns</span> ${oltId}`;
+    
+    // Injeta a data e hora padronizadas com filtro regex
+    let datePart = '--/--/----';
+    let timePart = '--:--:--';
+    let cellData = window.POTENCIA_LAST_UPDATES[oltId] ? String(window.POTENCIA_LAST_UPDATES[oltId]) : '';
+
+    if (cellData && cellData !== '--/-- --:--') {
+        const dateMatch = cellData.match(/\d{2}\/\d{2}\/\d{2,4}/);
+        const timeMatch = cellData.match(/\d{2}:\d{2}(:\d{2})?/);
+
+        if (dateMatch) datePart = dateMatch[0];
+        if (timeMatch) timePart = timeMatch[0];
     }
+
+    const elDate = document.getElementById('potencia-update-date');
+    const elTime = document.getElementById('potencia-update-time');
+    if (elDate) elDate.textContent = datePart;
+    if (elTime) elTime.textContent = timePart;
     
     const clientes = window.POTENCIA_CLIENTS_DATA[oltId] || [];
 

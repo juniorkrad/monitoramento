@@ -319,9 +319,6 @@ window.startEnergyMonitoring = async function() {
 
         // ==============================================================================
         // --- OS ALARMES SINGULARES E MÚLTIPLOS DE ENERGIA FORAM DESATIVADOS ---
-        // O motor agora funciona apenas como um "Agente Secreto", baixando e 
-        // processando os dados brutos (window.ENERGY_DATA_STORE) para que o 
-        // home-engine.js possa calcular os Alarmes Híbridos em silêncio.
         // ==============================================================================
         window.NETWORK_ENERGY_STORE = new Set();
         // ==============================================================================
@@ -338,10 +335,10 @@ window.startEnergyMonitoring = async function() {
                 const pctOfflineOther = oData.totalClients ? (oData.offlineOther / oData.totalClients * 100) : 0;
                 
                 gridEl.innerHTML += `
-                    <div class="energy-olt-card overview-card" style="display: flex; flex-direction: column;">
-                        <div class="energy-olt-card-header">
+                    <div class="overview-card" style="display: flex; flex-direction: column;">
+                        <div class="card-header">
                             <h3><span class="material-symbols-rounded">dns</span> ${oData.id}</h3>
-                            <button class="btn-energy-details" onclick="window.openEnergyModal('${oData.id}')" title="Ver Detalhes">
+                            <button class="card-header-button" onclick="window.openEnergyModal('${oData.id}')" title="Ver Detalhes">
                                 <span class="material-symbols-rounded" style="font-size: 22px;">manage_search</span>
                             </button>
                         </div>
@@ -378,8 +375,28 @@ window.openEnergyModal = function(oltId) {
     const modal = document.getElementById('energy-detail-modal');
     if (!modal) return;
     const oData = window.ENERGY_DATA_STORE.olts[oltId];
-    document.getElementById('energy-modal-title').innerHTML = `<span class="material-symbols-rounded">router</span> Detalhes - ${oltId}`;
-    document.getElementById('energy-modal-last-update').innerHTML = `<span class="material-symbols-rounded" style="font-size: 14px;">history</span> Última Varredura: ${oData.lastUpdate}`;
+    
+    // Título padronizado: Ícone DNS e apenas o nome da OLT
+    document.getElementById('energy-modal-title').innerHTML = `<span class="material-symbols-rounded">dns</span> ${oltId}`;
+    
+    // Data e Hora padronizadas com filtro regex
+    let datePart = '--/--/----';
+    let timePart = '--:--:--';
+    let cellData = oData.lastUpdate ? String(oData.lastUpdate) : '';
+
+    if (cellData && cellData !== '--/-- --:--') {
+        const dateMatch = cellData.match(/\d{2}\/\d{2}\/\d{2,4}/);
+        const timeMatch = cellData.match(/\d{2}:\d{2}(:\d{2})?/);
+
+        if (dateMatch) datePart = dateMatch[0];
+        if (timeMatch) timePart = timeMatch[0];
+    }
+
+    const elDate = document.getElementById('energy-update-date');
+    const elTime = document.getElementById('energy-update-time');
+    if (elDate) elDate.textContent = datePart;
+    if (elTime) elTime.textContent = timePart;
+
     const placasGrid = document.getElementById('energy-placas-list');
     placasGrid.innerHTML = '';
     const placas = Object.keys(oData.ports).sort((a, b) => parseInt(a) - parseInt(b));
