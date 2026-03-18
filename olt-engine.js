@@ -1,6 +1,5 @@
 // ==============================================================================
 // olt-engine.js - Motor Dedicado de Monitoramento de Rede (Individual e Global)
-// Atualização: Fonte de dados limpa para Múltiplas Portas (Minimalista)
 // ==============================================================================
 
 const ENGINE_API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
@@ -225,22 +224,17 @@ async function runGlobalNetworkOverview() {
             }
         }
         
-        // --- LÓGICA DO SILENCIADOR DE BACKBONE E AGRUPADOR MULTI-PORTAS ---
         let filteredProblems = localProblems;
         
         if (ports100Down >= 2) { 
             currentBackbones.add(result.id); 
-            // Se for Backbone, silencia os críticos absolutos (SUPER) para não poluir
             filteredProblems = localProblems.filter(p => p.severity !== 'SUPER');
         } 
 
-        // Se houver 2 ou mais portas restantes com problema (Atenção/Problema), unifica tudo num só card
         if (filteredProblems.length >= 2) {
-            // AQUI ESTÁ A MUDANÇA: Envia apenas as portas limpas, sem as severidades ao lado
             const multiStr = filteredProblems.map(p => p.porta).join(',');
             allProblems.add(`[${result.id}] STATUS::MULTI::${multiStr}`);
         } 
-        // Se houver apenas 1 porta com problema, mantém o alarme individual
         else if (filteredProblems.length === 1) {
             const p = filteredProblems[0];
             allProblems.add(`[${result.id}] STATUS::${p.severity}_${p.porta}::${p.off}`);
@@ -378,13 +372,49 @@ window.startOltMonitoring = function(config) {
         window.CURRENT_OLT_PORT_DATA = {}; 
         window.OLT_CLIENTS_DATA = {}; 
 
-        const rangeOlt = `${config.id}!A:I`; 
+        const rangeOlt = `${config.id}!A:Z`; 
         const urlOlt = `https://sheets.googleapis.com/v4/spreadsheets/${ENGINE_SHEET_ID}/values/${rangeOlt}?key=${ENGINE_API_KEY}`;
 
         try {
             const [responseOlt, rowsCircuitos] = await Promise.all([fetch(urlOlt), fetchCircuitosData()]);
             if (!responseOlt.ok) throw new Error('Falha API OLT');
             const dataOlt = await responseOlt.json();
+
+            // --- INÍCIO DA CAPTURA BLINDADA COM REGEX ---
+            let datePart = '--/--/----';
+            let timePart = '--:--:--';
+            
+            if (dataOlt.values && dataOlt.values.length > 0) {
+                const firstRow = dataOlt.values[0];
+                let cellData = firstRow[10] ? String(firstRow[10]) : '';
+                
+                // Se K1 estiver vazio, procura na linha inteira
+                if (!cellData) {
+                    for (let i = firstRow.length - 1; i >= 0; i--) {
+                        let val = firstRow[i] ? String(firstRow[i]) : '';
+                        if (val.match(/\d{2}\/\d{2}/) && val.match(/\d{2}:\d{2}/)) {
+                            cellData = val;
+                            break;
+                        }
+                    }
+                }
+                
+                if (cellData) {
+                    // Ignora qualquer texto e suga apenas os formatos numéricos puros
+                    const dateMatch = cellData.match(/\d{2}\/\d{2}\/\d{2,4}/);
+                    const timeMatch = cellData.match(/\d{2}:\d{2}(:\d{2})?/);
+                    
+                    if (dateMatch) datePart = dateMatch[0];
+                    if (timeMatch) timePart = timeMatch[0];
+                }
+            }
+            
+            const elDate = document.getElementById('olt-update-date');
+            const elTime = document.getElementById('olt-update-time');
+            if (elDate) elDate.textContent = datePart;
+            if (elTime) elTime.textContent = timePart;
+            // --- FIM DA CAPTURA BLINDADA ---
+
             const rowsOlt = (dataOlt.values || []).slice(1);
 
             rowsOlt.forEach(columns => {
