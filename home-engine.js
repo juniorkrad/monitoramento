@@ -1,29 +1,24 @@
 /* ==========================================================================
    home-engine.js - Controlador Geral e Vigilante de Alarmes (Home)
-   Atualização: Remoção de Alarmes Puros de Energia, Foco em Rede e Híbrido
+   Atualização: Restauração da Regra dos 70% e Cérebro Matemático
    ========================================================================== */
 
-let lastNotifiedState = ""; // Memória unificada para não spammar os alarmes
+let lastNotifiedState = ""; 
 
 function watchHomeAlarms() {
-    // Busca os dados dos cofres de rede gerados pelos motores
     let networkProblems = new Set(window.NETWORK_PROBLEMS_STORE || []);
     let backboneProblems = new Set(window.NETWORK_BACKBONE_STORE || []);
     let hybridProblems = new Set(); 
 
-    // ============================================================
-    // 1. VIGILANTE DE ENERGIA E MOTOR HÍBRIDO
-    // ============================================================
     if (window.ENERGY_DATA_STORE && window.ENERGY_DATA_STORE.global) {
         const globalData = window.ENERGY_DATA_STORE.global;
 
-        // Atualiza o número total de clientes sem energia na Home
         const totalPowerOffEl = document.getElementById('global-poweroff-total');
         if (totalPowerOffEl) {
             totalPowerOffEl.innerText = globalData.powerOff;
+            totalPowerOffEl.style.display = 'block';
         }
 
-        // Atualiza o contexto (OLTs afetadas e Impacto) na Home
         const contextEl = document.getElementById('global-poweroff-context');
         if (contextEl) {
             const impacto = globalData.totalClients > 0 
@@ -45,7 +40,7 @@ function watchHomeAlarms() {
         }
 
         // ============================================================
-        // 1.2 CRIAÇÃO DO ALARME HÍBRIDO (PORTA A PORTA)
+        // A REGRA DOS 70% (RESTAURADA)
         // ============================================================
         for (const oltId in window.ENERGY_DATA_STORE.olts) {
             const oltData = window.ENERGY_DATA_STORE.olts[oltId];
@@ -58,6 +53,7 @@ function watchHomeAlarms() {
                     if (pData.offline >= 16 && pData.powerOff > 0) {
                         const overlap = pData.powerOff / pData.offline;
                         if (overlap >= 0.70) {
+                            // O formato exato que a RegEx do notifications-old espera
                             hybridProblems.add(`[${oltId}] HIBRIDO::${pt}::${pData.offline}::${pData.powerOff}`);
                         }
                     }
@@ -66,12 +62,10 @@ function watchHomeAlarms() {
         }
     }
 
-    // Exporta os híbridos encontrados
+    // Exporta os híbridos
     window.NETWORK_HYBRID_STORE = hybridProblems;
 
-    // ============================================================
-    // 2. DISPARO CENTRALIZADO DE TODOS OS ALARMES
-    // ============================================================
+    // Disparo sincronizado com trava protetora original
     const currentStateStr = 
         Array.from(networkProblems).sort().join('|') + "||" + 
         Array.from(backboneProblems).sort().join('|') + "||" + 
@@ -81,40 +75,18 @@ function watchHomeAlarms() {
         lastNotifiedState = currentStateStr;
         
         if (typeof checkAndNotifyForNewProblems === 'function') {
-            // Passa um Set vazio no local dos problemas de energia puros
             checkAndNotifyForNewProblems(networkProblems, backboneProblems, new Set(), hybridProblems);
         }
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof loadHeader === 'function') {
-        loadHeader({ title: "Dashboard Gerencial", exactTitle: true });
-    }
-    
-    if (typeof loadFooter === 'function') {
-        loadFooter();
-    }
-
-    setTimeout(() => {
-        const timestampEl = document.getElementById('update-timestamp');
-        if (timestampEl) {
-            const now = new Date();
-            const data = now.toLocaleDateString('pt-BR');
-            const hora = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            
-            timestampEl.innerHTML = `
-                <span class="material-symbols-rounded">calendar_today</span> ${data}
-                <span style="width: 1px; height: 12px; background: rgba(255,255,255,0.3); margin: 0 5px;"></span>
-                <span class="material-symbols-rounded">schedule</span> ${hora}
-            `;
-            timestampEl.style.color = 'var(--m3-on-surface-variant)';
-        }
-    }, 500);
-
-    const isHomePage = window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html');
-    
-    if (isHomePage) {
+    if (checkIsHomePage()) {
+        if (typeof loadHeader === 'function') loadHeader({ title: "Dashboard Gerencial", exactTitle: true });
+        if (typeof loadFooter === 'function') loadFooter();
+        
+        setTimeout(updateGlobalTimestamp, 500);
+        
         setInterval(watchHomeAlarms, 2000); 
     }
 });

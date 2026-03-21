@@ -1,36 +1,11 @@
 // ==============================================================================
 // potencia-engine.js - Motor Dedicado para Análise de Potência Óptica
+// Atualização: Itens super compactados para a nova grade Justa da Home
 // ==============================================================================
 
-const POTENCIA_API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
-const POTENCIA_SHEET_ID = '1BDx0zd0UGzOr2qqg1nftfe5WLUMh6MkcFO5psAG5GtU';
-const POTENCIA_REFRESH_SECONDS = 300; // 5 minutos
-
-const POTENCIA_OLT_LIST = [
-    { id: 'HEL-1', sheetTab: 'HEL1', type: 'nokia' },
-    { id: 'HEL-2', sheetTab: 'HEL2', type: 'nokia' },
-    { id: 'PQA-1', sheetTab: 'PQA1', type: 'nokia' },
-    { id: 'PSV-1', sheetTab: 'PSV1', type: 'nokia' },
-    { id: 'MGP',   sheetTab: 'MGP',  type: 'nokia' },
-    { id: 'LTXV-1', sheetTab: 'LTXV1', type: 'furukawa-10' }, 
-    { id: 'LTXV-2', sheetTab: 'LTXV2', type: 'furukawa-2' },
-    { id: 'PQA-2',  sheetTab: 'PQA2',  type: 'furukawa-2' },
-    { id: 'PQA-3',  sheetTab: 'PQA3',  type: 'furukawa-2' },
-    { id: 'SB-1',   sheetTab: 'SB1',   type: 'furukawa-2' },
-    { id: 'SB-2',   sheetTab: 'SB2',   type: 'furukawa-2' },
-    { id: 'SB-3',   sheetTab: 'SB3',   type: 'furukawa-2' },
-    { id: 'PSV-7',  sheetTab: 'PSV7',  type: 'furukawa-2' },
-    { id: 'SBO-1',  sheetTab: 'SBO1',  type: 'furukawa-10' },
-    { id: 'SBO-2',  sheetTab: 'SBO2',  type: 'furukawa-2' },
-    { id: 'SBO-3',  sheetTab: 'SBO3',  type: 'furukawa-2' },
-    { id: 'SBO-4',  sheetTab: 'SBO4',  type: 'furukawa-2' }
-];
-
-// Memória global
 window.POTENCIA_CLIENTS_DATA = {};
-window.POTENCIA_LAST_UPDATES = {}; // Cofre para guardar as datas de cada OLT
+window.POTENCIA_LAST_UPDATES = {}; 
 
-// Função para limpar e converter a string de potência num número real
 function parsePowerValue(powerStr) {
     if (!powerStr) return null;
     const cleaned = powerStr.replace(/[^\d.-]/g, '');
@@ -43,10 +18,9 @@ async function runPotenciaEngine() {
     const globalBody = document.getElementById('global-potencia-body');
     const timestampEl = document.getElementById('update-timestamp');
     
-    // Identifica se está rodando na página oficial de Potência
     const isPotenciaPage = window.location.pathname.includes('potencia.html');
     
-    if (!globalBody && !gridEl) return; // Trava básica se nenhum elemento for encontrado
+    if (!globalBody && !gridEl) return; 
 
     if (timestampEl && timestampEl.textContent.includes('Aguardando')) {
         timestampEl.innerHTML = '<span class="material-symbols-rounded">hourglass_empty</span> Buscando dados...';
@@ -61,295 +35,239 @@ async function runPotenciaEngine() {
         window.POTENCIA_CLIENTS_DATA = {};
         window.POTENCIA_LAST_UPDATES = {};
 
-        // Busca agora vai de A até K (para alcançar a coluna do Timestamp na Planilha)
-        const ranges = POTENCIA_OLT_LIST.map(o => `${o.sheetTab}!A:K`);
-        const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${POTENCIA_SHEET_ID}/values:batchGet?key=${POTENCIA_API_KEY}&ranges=${ranges.join('&ranges=')}`;
-        
-        const response = await fetch(batchUrl);
-        const dataBatch = await response.json();
+        const ranges = GLOBAL_MASTER_OLT_LIST.map(o => o.type === 'nokia' ? `${o.sheetTab}!A:L` : `${o.sheetTab}!A:H`);
+        const dataBatch = await API.getBatch(ranges);
 
-        if (!dataBatch.valueRanges) throw new Error("Falha ao carregar dados da API.");
+        if (!dataBatch.valueRanges) throw new Error("Falha na estrutura de retorno da API de Potência");
 
-        POTENCIA_OLT_LIST.forEach((olt, index) => {
-            const rawValues = dataBatch.valueRanges[index].values;
+        GLOBAL_MASTER_OLT_LIST.forEach((olt, index) => {
+            const rows = dataBatch.valueRanges[index].values ? dataBatch.valueRanges[index].values.slice(1) : [];
             
-            // 1. EXTRAÇÃO CIRÚRGICA DO TIMESTAMP (Na Célula K1 - Coluna índice 10)
-            let timestamp = '--/-- --:--';
-            if (rawValues && rawValues.length > 0) {
-                timestamp = rawValues[0][10] || '--/-- --:--';
-                timestamp = timestamp.replace('Atualizado em:', '').trim();
-            }
-            window.POTENCIA_LAST_UPDATES[olt.id] = timestamp;
-            
-            // 2. CORTA A LINHA 1 PARA O LOOP DE DADOS
-            const rows = rawValues && rawValues.length > 1 ? rawValues.slice(1) : [];
-            
-            let criticosNestaOlt = 0;
-            let totalNestaOlt = 0;
-            let clientesCriticos = [];
+            let analisados = 0;
+            let criticos = 0;
+            let dbmSums = 0;
+            let lastUpdateStr = '--/-- --:--';
 
-            rows.forEach(col => {
-                if(col.length === 0) return;
-                
-                let portaFinal = '';
-                let serial = '';
-                let potenciaStr = '';
-                let codigoCliente = '';
-                let isCritical = false;
-                let potenciaValue = null;
+            window.POTENCIA_CLIENTS_DATA[olt.id] = [];
 
-                if (olt.type === 'nokia') {
-                    let portaRaw = col[0] || '';
-                    if (portaRaw.includes('1/1/')) {
-                        let parts = portaRaw.split('/');
-                        if(parts.length >= 4) portaFinal = `${parts[2]}/${parts[3]}`;
-                    }
-                    serial = col[2] || '-';
-                    potenciaStr = col[5] || '';
-                    codigoCliente = col[8] || '-';
-                    
-                    potenciaValue = parsePowerValue(potenciaStr);
-                    if (potenciaValue !== null && potenciaValue <= -25) {
-                        isCritical = true;
-                    }
-                } else {
-                    let portaRaw = col[0] || '';
-                    if (olt.type === 'furukawa-10') {
-                        portaFinal = portaRaw;
-                    } else {
-                        let match = portaRaw.match(/GPON(\d+\/\d+)/i);
-                        if (match) portaFinal = match[1];
-                        else portaFinal = portaRaw;
-                    }
-
-                    serial = col[3] || '-';
-                    potenciaStr = col[5] || '';
-                    codigoCliente = col[7] || '-';
-
-                    potenciaValue = parsePowerValue(potenciaStr);
-                    if (potenciaValue !== null && potenciaValue <= -23) {
-                        isCritical = true;
+            if (dataBatch.valueRanges[index].values && dataBatch.valueRanges[index].values.length > 0) {
+                const firstRow = dataBatch.valueRanges[index].values[0];
+                let cellData = firstRow[10] ? String(firstRow[10]) : '';
+                if (!cellData) {
+                    for (let i = firstRow.length - 1; i >= 0; i--) {
+                        let val = firstRow[i] ? String(firstRow[i]) : '';
+                        if (val.match(/\d{2}\/\d{2}/) && val.match(/\d{2}:\d{2}/)) {
+                            cellData = val; break;
+                        }
                     }
                 }
+                if (cellData) {
+                    const dateMatch = cellData.match(/\d{2}\/\d{2}\/\d{2,4}/);
+                    const timeMatch = cellData.match(/\d{2}:\d{2}(:\d{2})?/);
+                    if (dateMatch && timeMatch) lastUpdateStr = `${dateMatch[0]} ${timeMatch[0]}`;
+                }
+            }
 
-                if (potenciaValue !== null) {
-                    totalNestaOlt++;
-                    globalAnalisados++;
+            window.POTENCIA_LAST_UPDATES[olt.id] = lastUpdateStr;
+
+            rows.forEach(columns => {
+                if (columns.length === 0) return;
+
+                let isOnline = false, pwrStr = '', porta = '', serial = '', codigo = '';
+
+                if (olt.type === 'nokia') {
+                    isOnline = (columns[4] || '').trim().toLowerCase().includes('up');
+                    if (!isOnline) return;
+                    pwrStr = columns[11];
+                    porta = columns[0] || '';
+                    serial = columns[2] || '';
+                    codigo = columns[8] || ''; 
+                } else {
+                    isOnline = (columns[2] || '').trim().toLowerCase() === 'active';
+                    if (!isOnline) return;
+                    pwrStr = columns[5];
+                    porta = columns[0] || '';
+                    serial = columns[3] || '';
+                    codigo = columns[7] || ''; 
+                }
+
+                const powerVal = parsePowerValue(pwrStr);
+                
+                if (powerVal !== null && powerVal !== 0 && powerVal < 0 && powerVal > -60.00) {
+                    analisados++;
+                    dbmSums += powerVal;
+                    let pLevel = 'normal';
                     
-                    if (isCritical && portaFinal) {
-                        criticosNestaOlt++;
-                        globalCriticos++;
-                        const clientData = { olt: olt.id, porta: portaFinal, serial: serial, potencia: potenciaValue, codigo: codigoCliente };
-                        clientesCriticos.push(clientData);
-                        todosClientesCriticos.push(clientData); 
-                    }
+                    if (powerVal <= -28.00) { 
+                        criticos++; 
+                        pLevel = 'critico'; 
+                        const cData = { olt: olt.id, porta, serial, codigo, potencia: powerVal };
+                        window.POTENCIA_CLIENTS_DATA[olt.id].push(cData);
+                        todosClientesCriticos.push(cData);
+                    } 
+                    else if (powerVal <= -26.00) pLevel = 'atencao';
                 }
             });
 
-            clientesCriticos.sort((a, b) => a.potencia - b.potencia);
-            
-            window.POTENCIA_CLIENTS_DATA[olt.id] = clientesCriticos;
-            oltStats.push({ id: olt.id, criticos: criticosNestaOlt, total: totalNestaOlt });
+            const media = analisados > 0 ? (dbmSums / analisados).toFixed(2) : 0;
+            const health = analisados > 0 ? (((analisados - criticos) / analisados) * 100) : 0;
+
+            oltStats.push({
+                id: olt.id,
+                analisados,
+                criticos,
+                media,
+                health,
+                lastUpdate: lastUpdateStr
+            });
+
+            globalCriticos += criticos;
+            globalAnalisados += analisados;
         });
 
-        // =========================================================
-        // ATUALIZAÇÃO DA INTERFACE VISUAL DA HOME (Se a div existir)
-        // =========================================================
         if (globalBody) {
-            
-            // PROCESSAMENTO DOS 5 PIORES DA REDE
             todosClientesCriticos.sort((a, b) => a.potencia - b.potencia);
-            const piores5 = todosClientesCriticos.slice(0, 5);
+            const top5Piores = todosClientesCriticos.slice(0, 5);
 
-            let piores5Html = '';
-            if (piores5.length > 0) {
-                // Cabeçalho da Tabela Estrita e Alinhada à Esquerda
-                piores5Html = `
-                    <div style="display: grid; grid-template-columns: 1.5fr 2fr 1fr 1fr; gap: 10px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 8px; color: var(--m3-on-surface-variant); font-weight: 700; text-align: left;">
-                        <div>OLT / Porta</div>
-                        <div>Serial</div>
-                        <div>Código</div>
-                        <div style="text-align: right;">Sinal</div>
+            let rankingPioresHtml = '';
+            top5Piores.forEach((c, index) => {
+                // Padding e margens cortadas para o limite
+                rankingPioresHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); width: 100%;">
+                       <div style="display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left;">
+                           <strong style="color: var(--m3-on-surface); font-size: 1rem;">
+                               <span style="color: var(--m3-on-surface-variant); margin-right: 5px;">${index + 1}º</span> 
+                               ${c.olt} <span style="color:var(--m3-outline); font-weight: normal; margin: 0 3px;">|</span> ${c.porta}
+                           </strong>
+                           <span style="color: var(--m3-on-surface-variant); font-family: var(--font-family-mono); font-size: 0.75rem;">SN: ${c.serial} <span style="color:var(--m3-outline); font-weight: normal; margin: 0 3px;">|</span> Cód: ${c.codigo}</span>
+                       </div>
+                       <span style="font-family: var(--font-family-mono); font-weight: bold; color: #f87171; font-size: 1.1rem;">${c.potencia} dBm</span>
                     </div>
                 `;
-                // Linhas da Tabela Estritas
-                piores5.forEach(c => {
-                    piores5Html += `
-                        <div style="display: grid; grid-template-columns: 1.5fr 2fr 1fr 1fr; gap: 10px; font-size: 0.85rem; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.03); padding: 6px 0; text-align: left;">
-                            <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong style="color: var(--m3-on-surface);">${c.olt}</strong> <span style="opacity: 0.7;">(${c.porta})</span></div>
-                            <div style="font-family: var(--font-family-mono); opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${c.serial}</div>
-                            <div style="opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${c.codigo}</div>
-                            <div style="text-align: right; color: #f87171; font-weight: bold; font-family: var(--font-family-mono);">${c.potencia}</div>
-                        </div>
-                    `;
-                });
-            } else {
-                piores5Html = `<div style="text-align: center; color: var(--m3-color-success); font-weight: bold; margin-top: 20px;"><span class="material-symbols-rounded" style="vertical-align: middle;">verified</span> Nenhum sinal crítico na rede!</div>`;
+            });
+
+            if (rankingPioresHtml === '') {
+                rankingPioresHtml = `<div style="text-align: center; color: var(--m3-color-success); font-weight: 700; margin-top: 15px; width: 100%;"><span class="material-symbols-rounded" style="font-size: 48px;">sentiment_very_satisfied</span><br>Rede 100% Saudável!</div>`;
             }
 
-            // RANKING (Esticado em barras)
-            oltStats.sort((a, b) => b.criticos - a.criticos);
-            const pioresOlts = oltStats.filter(o => o.criticos > 0).slice(0, 3);
-            
-            let rankingHtml = '';
-            if (pioresOlts.length > 0) {
-                pioresOlts.forEach((olt, idx) => {
-                    const offlinePct = olt.total > 0 ? (olt.criticos / olt.total) * 100 : 0;
-                    rankingHtml += `
-                        <div style="margin-bottom: 18px; width: 100%;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; align-items: baseline;">
-                                <strong style="color: var(--m3-on-surface); font-size: 1.2rem;">${idx + 1}º ${olt.id}</strong>
-                                <span class="stat-number" style="font-size: 1.3rem; color: #f87171; width: auto;">${olt.criticos} OFF</span>
-                            </div>
-                            <div style="height: 12px; background: var(--m3-surface-container-high); border-radius: 6px; overflow: hidden; width: 100%;">
-                                <div style="height: 100%; width: ${offlinePct}%; background: #f87171; border-radius: 6px;"></div>
-                            </div>
-                        </div>
-                    `;
-                });
-            } else {
-                rankingHtml = `<span style="color: var(--m3-color-success); font-weight: bold;"><span class="material-symbols-rounded" style="vertical-align: middle;">check_circle</span> Rede 100% no padrão!</span>`;
-            }
-
-            // INJEÇÃO DA HOME (Aplicando as correções de layout solicitadas)
             globalBody.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: stretch; width: 100%; flex-wrap: wrap; gap: 20px; height: 100%;">
-                    
-                    <div class="card-stats" style="flex: 1; min-width: 200px; display: flex; flex-direction: column; justify-content: center;">
-                        <div class="stat-item global-stat" style="display: flex; flex-direction: column; align-items: flex-start; padding: 0;">
-                            <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 5px; gap: 8px;">
-                                <span class="material-symbols-rounded" style="font-size: 24px; color: var(--m3-on-surface-variant); opacity: 0.9;">cable</span>
-                                <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Clientes Lidos</span>
-                            </div>
-                            <h2 class="stat-number" style="margin: 0; color: var(--m3-on-surface); line-height: 1; font-size: 2.2rem;">${globalAnalisados}</h2>
-                        </div>
-                        <div class="stat-item offline global-stat" style="display: flex; flex-direction: column; align-items: flex-start; margin-top: 25px; padding: 0;">
-                            <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 5px; gap: 8px;">
-                                <span class="material-symbols-rounded" style="font-size: 24px; color: #f87171; opacity: 0.9;">sensors_off</span>
-                                <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Sinal Crítico</span>
-                            </div>
-                            <h2 class="stat-number" style="margin: 0; color: #f87171; line-height: 1; font-size: 2.2rem;">${globalCriticos}</h2>
-                        </div>
+                <div style="width: 100%; display: flex; flex-direction: column; justify-content: stretch; height: 100%;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span class="material-symbols-rounded" style="color: #f87171; font-size: 20px;">warning</span>
+                        <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Top 5 Piores Sinais</h3>
                     </div>
-                    
-                    <div style="flex: 1.8; border-left: 1px solid var(--m3-outline); padding-left: 30px; min-width: 380px; display: flex; flex-direction: column; justify-content: center;">
-                        <h4 style="margin-top: 0; color: var(--m3-on-surface-variant); margin-bottom: 15px; display: flex; align-items: center; gap: 6px;">
-                            <span class="material-symbols-rounded" style="font-size: 20px; color: #f87171;">warning</span> Top 5 Piores Sinais da Rede
-                        </h4>
-                        <div style="width: 100%;">
-                            ${piores5Html}
-                        </div>
-                    </div>
-                    
-                    <div style="flex: 1; border-left: 1px solid var(--m3-outline); padding-left: 30px; min-width: 250px; display: flex; flex-direction: column; justify-content: center;">
-                        <h4 style="margin-top: 0; color: var(--m3-on-surface-variant); margin-bottom: 15px;">Equipamentos em Alerta</h4>
-                        <div style="width: 100%;">
-                            ${rankingHtml}
-                        </div>
+                    <div style="flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start;">
+                        ${rankingPioresHtml}
                     </div>
                 </div>
             `;
         }
 
-        // =========================================================
-        // ATUALIZAÇÃO DA INTERFACE INDIVIDUAL (Apenas na página de Potência)
-        // =========================================================
         if (isPotenciaPage && gridEl) {
             gridEl.innerHTML = '';
-            oltStats.forEach(olt => {
-                const percOlt = olt.total > 0 ? ((olt.criticos / olt.total) * 100).toFixed(1) : 0;
-                let statusColor = olt.criticos > 0 ? '#f87171' : 'var(--m3-color-success)';
+            
+            todosClientesCriticos.sort((a, b) => a.potencia - b.potencia);
+            const pioresRede = todosClientesCriticos.slice(0, 10);
+            
+            let htmlPiores = '';
+            pioresRede.forEach((c, idx) => {
+                htmlPiores += `
+                    <tr>
+                        <td style="font-family: var(--font-family-mono); font-size: 0.8rem;">${idx + 1}º</td>
+                        <td style="font-weight: bold;">${c.olt}</td>
+                        <td style="font-family: var(--font-family-mono);">${c.porta}</td>
+                        <td style="color: #f87171; font-weight: bold; font-family: var(--font-family-mono);">${c.potencia} dBm</td>
+                    </tr>
+                `;
+            });
 
+            gridEl.innerHTML += `
+                <div class="overview-card piores-card" style="grid-column: 1 / -1; display: flex; flex-direction: row; background: rgba(248, 113, 113, 0.05); border: 1px solid rgba(248, 113, 113, 0.2);">
+                    <div style="flex: 0 0 250px; padding: 25px; border-right: 1px solid rgba(248, 113, 113, 0.2); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                        <span class="material-symbols-rounded" style="font-size: 54px; color: #f87171; margin-bottom: 15px;">warning</span>
+                        <h3 style="color: #f87171; margin: 0 0 10px 0; font-size: 1.2rem;">TOP 10 PIORES</h3>
+                        <p style="font-size: 0.85rem; color: var(--m3-on-surface-variant); margin: 0;">Sinais mais críticos detectados em toda a rede no momento.</p>
+                    </div>
+                    <div style="flex: 1; padding: 15px 25px; max-height: 250px; overflow-y: auto;" class="custom-scroll">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--m3-on-surface-variant); font-size: 0.8rem; text-transform: uppercase;">
+                                    <th style="padding: 10px 5px;">Pos</th>
+                                    <th style="padding: 10px 5px;">OLT</th>
+                                    <th style="padding: 10px 5px;">Placa/Porta</th>
+                                    <th style="padding: 10px 5px;">Sinal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${htmlPiores || '<tr><td colspan="4" style="padding: 15px; text-align: center;">Nenhum sinal crítico extremo detectado.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            oltStats.sort((a, b) => b.criticos - a.criticos);
+            
+            oltStats.forEach(o => {
+                const btnHtml = `
+                    <button class="card-header-button" onclick="window.abrirModalPotencia('${o.id}')" title="Ver Clientes">
+                        <span class="material-symbols-rounded" style="font-size: 22px;">list_alt</span>
+                    </button>`;
+                
                 gridEl.innerHTML += `
                     <div class="overview-card" style="display: flex; flex-direction: column;">
-                        <div class="card-header">
-                            <h3><span class="material-symbols-rounded">dns</span> ${olt.id}</h3>
-                            <button class="card-header-button" onclick="window.abrirModalPotencia('${olt.id}')" title="Ver Detalhes">
-                                <span class="material-symbols-rounded" style="font-size: 22px;">manage_search</span>
-                            </button>
+                        <div class="card-header" style="justify-content: space-between;">
+                            <h3><span class="material-symbols-rounded">dns</span> ${o.id}</h3>
+                            ${btnHtml}
                         </div>
-                        <div class="card-body" style="padding: 20px; display: flex; align-items: center; justify-content: space-between;">
-                            <div>
-                                <span style="font-size: 2.2rem; font-weight: 800; color: ${statusColor};">${olt.criticos}</span><br>
-                                <span style="color: var(--m3-on-surface-variant); font-size: 0.8rem; text-transform: uppercase;">Atenção Necessária</span>
+                        <div class="card-body" style="flex-direction: column; padding: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="material-symbols-rounded" style="color:var(--m3-on-surface); font-size: 18px;">search</span>
+                                        <span style="font-size: 1.1rem; color:var(--m3-on-surface); font-weight: 500;">${o.analisados}</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="material-symbols-rounded" style="color:#fbbf24; font-size: 18px;">warning</span>
+                                        <span style="font-size: 1.1rem; color:#fbbf24; font-weight: bold;">${o.criticos}</span>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="font-size: 2rem; font-family: var(--font-family-mono); font-weight: bold; color: ${o.health >= 90 ? 'var(--m3-color-success)' : 'var(--m3-color-error)'};">${o.health.toFixed(1)}%</span><br>
+                                    <span style="font-size: 0.75rem; color: var(--m3-on-surface-variant); text-transform: uppercase;">Saúde</span>
+                                </div>
                             </div>
-                            <div style="text-align: right;">
-                                <span style="font-size: 1.2rem; font-weight: bold; color: var(--m3-on-surface);">${percOlt}%</span><br>
-                                <span style="color: var(--m3-on-surface-variant); font-size: 0.8rem;">do equipamento</span>
+                            <div style="border-top: 1px solid var(--m3-outline); padding-top: 12px; font-size: 0.85rem; color: var(--m3-on-surface-variant); display: flex; justify-content: space-between;">
+                                <span>Média: <strong style="color: var(--m3-on-surface);">${o.media} dBm</strong></span>
+                                <span style="font-size: 0.75rem;">${o.lastUpdate}</span>
                             </div>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
         }
 
-        // =========================================================
-        // ATUALIZAÇÃO DO RELÓGIO (Se o elemento existir)
-        // =========================================================
-        if (timestampEl) {
-            const now = new Date();
-            timestampEl.innerHTML = `
-                <span class="material-symbols-rounded">calendar_today</span> ${now.toLocaleDateString('pt-BR')}
-                <span style="width: 1px; height: 12px; background: rgba(255,255,255,0.3); margin: 0 5px;"></span>
-                <span class="material-symbols-rounded">schedule</span> ${now.toLocaleTimeString('pt-BR')}
-            `;
-            timestampEl.classList.remove('updated-anim');
-            void timestampEl.offsetWidth; 
-            timestampEl.classList.add('updated-anim');
-        }
-
     } catch (e) {
-        console.error("Erro no Motor de Potência:", e);
-        if (globalBody) {
-            globalBody.innerHTML = `<p style="color: #f87171;">❌ Falha ao processar os dados da rede. Verifique a conexão.</p>`;
-        }
+        console.error("Erro no motor de potência:", e);
     }
 }
 
-// ==============================================================================
-// CONTROLE DO MODAL DE CLIENTES (OTIMIZADO E PADRONIZADO)
-// ==============================================================================
-
 window.abrirModalPotencia = function(oltId) {
     const modal = document.getElementById('potencia-modal');
-    if (!modal) return; 
-
-    const tbody = document.getElementById('potencia-tbody');
-    const title = document.getElementById('modal-potencia-title');
-    const searchInput = document.getElementById('potencia-search');
+    if (!modal) return;
     
-    if (searchInput) searchInput.value = '';
+    document.getElementById('potencia-modal-title').innerHTML = `<span class="material-symbols-rounded">dns</span> ${oltId} - Sinais Críticos`;
     
-    // Título padronizado: Ícone DNS e apenas o nome da OLT
-    if (title) title.innerHTML = `<span class="material-symbols-rounded">dns</span> ${oltId}`;
-    
-    // Injeta a data e hora padronizadas com filtro regex
-    let datePart = '--/--/----';
-    let timePart = '--:--:--';
-    let cellData = window.POTENCIA_LAST_UPDATES[oltId] ? String(window.POTENCIA_LAST_UPDATES[oltId]) : '';
-
-    if (cellData && cellData !== '--/-- --:--') {
-        const dateMatch = cellData.match(/\d{2}\/\d{2}\/\d{2,4}/);
-        const timeMatch = cellData.match(/\d{2}:\d{2}(:\d{2})?/);
-
-        if (dateMatch) datePart = dateMatch[0];
-        if (timeMatch) timePart = timeMatch[0];
-    }
-
-    const elDate = document.getElementById('potencia-update-date');
-    const elTime = document.getElementById('potencia-update-time');
-    if (elDate) elDate.textContent = datePart;
-    if (elTime) elTime.textContent = timePart;
-    
+    const tbody = document.getElementById('potencia-detalhes-tbody');
     const clientes = window.POTENCIA_CLIENTS_DATA[oltId] || [];
-
+    
     if (clientes.length === 0) {
-        if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 30px; color: var(--m3-color-success); font-weight: bold;">Nenhum cliente fora do padrão nesta OLT. Parabéns!</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 30px;">Nenhum cliente com sinal crítico (<= -28 dBm) encontrado.</td></tr>`;
     } else {
-        let htmlBuffer = '';
+        clientes.sort((a, b) => a.potencia - b.potencia);
         
+        let htmlBuffer = '';
         clientes.forEach(c => {
-            let colorClass = c.potencia <= -30 ? 'sinal-critico' : 'sinal-atencao';
+            const colorClass = c.potencia <= -30.00 ? 'status-problema' : 'status-atencao';
             htmlBuffer += `
                 <tr class="linha-cliente-potencia">
                     <td style="font-weight: bold;">${c.porta}</td>
@@ -366,15 +284,32 @@ window.abrirModalPotencia = function(oltId) {
     modal.style.display = 'flex';
 };
 
-// ==============================================================================
-// INICIALIZADOR AUTÔNOMO
-// ==============================================================================
+window.fecharModalPotencia = function(event) {
+    if (event && event.target.id !== 'potencia-modal' && !event.target.classList.contains('close-modal')) return;
+    document.getElementById('potencia-modal').style.display = 'none';
+};
+
+window.filtrarTabelaPotencia = function() {
+    const termo = document.getElementById('potencia-search').value.toLowerCase();
+    const linhas = document.querySelectorAll('.linha-cliente-potencia');
+    
+    linhas.forEach(linha => {
+        const texto = linha.textContent.toLowerCase();
+        linha.style.display = texto.includes(termo) ? '' : 'none';
+    });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const isPotenciaPage = window.location.pathname.includes('potencia.html');
-    const isHomePage = window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html');
-
-    if (isPotenciaPage || isHomePage) {
-        runPotenciaEngine();
-        setInterval(runPotenciaEngine, POTENCIA_REFRESH_SECONDS * 1000);
+    
+    if (isPotenciaPage) {
+        if (typeof loadHeader === 'function') loadHeader({ title: "Análise de Potência", exactTitle: true });
+        if (typeof loadFooter === 'function') loadFooter();
+        setTimeout(updateGlobalTimestamp, 500);
+    }
+    
+    if (isPotenciaPage || checkIsHomePage()) {
+        setTimeout(runPotenciaEngine, 1000);
+        setInterval(runPotenciaEngine, GLOBAL_REFRESH_SECONDS * 1000);
     }
 });

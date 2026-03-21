@@ -1,39 +1,9 @@
 // ==============================================================================
 // olt-engine.js - Motor Dedicado de Monitoramento de Rede (Individual e Global)
+// Atualização: Elementos internos super compactos para nova grid da Home
 // ==============================================================================
 
-const ENGINE_API_KEY = 'AIzaSyA88uPhiRhU3JZwKYjA5B1rX7ndXpfka0I';
-const ENGINE_SHEET_ID = '1BDx0zd0UGzOr2qqg1nftfe5WLUMh6MkcFO5psAG5GtU';
-const ENGINE_REFRESH_SECONDS = 300;
-
 const TAB_CIRCUITOS = 'CIRCUITO'; 
-const TABLE_HEADER_NAME = 'Circuitos'; 
-
-const OLT_COLUMN_MAP = {
-    'HEL1':  1,  'HEL2':  3,  'MGP':   5,  'PQA1':  7,  'PSV1':  9,  'PSV7':  11,
-    'SBO2':  13, 'SBO3':  15, 'SBO4':  17, 'SB1':   19, 'SB2':   21, 'SB3':   23,
-    'PQA2':  25, 'PQA3':  27, 'LTXV2': 29, 'LTXV1': 31, 'SBO1':  33
-};
-
-const GLOBAL_OLT_LIST = [
-    { id: 'HEL-1', sheetTab: 'HEL1', type: 'nokia' },
-    { id: 'HEL-2', sheetTab: 'HEL2', type: 'nokia' },
-    { id: 'PQA-1', sheetTab: 'PQA1', type: 'nokia' },
-    { id: 'PSV-1', sheetTab: 'PSV1', type: 'nokia' },
-    { id: 'MGP',   sheetTab: 'MGP',  type: 'nokia' },
-    { id: 'LTXV-1', sheetTab: 'LTXV1', type: 'furukawa-10' }, 
-    { id: 'LTXV-2', sheetTab: 'LTXV2', type: 'furukawa-2' },
-    { id: 'PQA-2',  sheetTab: 'PQA2',  type: 'furukawa-2' },
-    { id: 'PQA-3',  sheetTab: 'PQA3',  type: 'furukawa-2' },
-    { id: 'SB-1',   sheetTab: 'SB1',   type: 'furukawa-2' },
-    { id: 'SB-2',   sheetTab: 'SB2',   type: 'furukawa-2' },
-    { id: 'SB-3',   sheetTab: 'SB3',   type: 'furukawa-2' },
-    { id: 'PSV-7',  sheetTab: 'PSV7',  type: 'furukawa-2' },
-    { id: 'SBO-1',  sheetTab: 'SBO1',  type: 'furukawa-10' },
-    { id: 'SBO-2',  sheetTab: 'SBO2',  type: 'furukawa-2' },
-    { id: 'SBO-3',  sheetTab: 'SBO3',  type: 'furukawa-2' },
-    { id: 'SBO-4',  sheetTab: 'SBO4',  type: 'furukawa-2' }
-];
 
 window.OLT_CLIENTS_DATA = {};
 window.CURRENT_OLT_PORT_DATA = {}; 
@@ -41,18 +11,11 @@ window.NETWORK_PROBLEMS_STORE = new Set();
 window.NETWORK_BACKBONE_STORE = new Set();
 window.currentOltInterval = null; 
 
-// ==============================================================================
-// FUNÇÕES DE VARREDURA DE REDE GLOBAL (PARA A HOME)
-// ==============================================================================
-
 async function fetchGlobalOltData(olt) {
     const range = olt.type === 'nokia' ? `${olt.sheetTab}!A:E` : `${olt.sheetTab}!A:C`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${ENGINE_SHEET_ID}/values/${range}?key=${ENGINE_API_KEY}`;
     
     try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`Falha aba ${olt.sheetTab}`);
-        const data = await response.json();
+        const data = await API.get(range);
         const rows = (data.values || []).slice(1);
         
         let totalOnline = 0, totalOffline = 0;
@@ -64,9 +27,12 @@ async function fetchGlobalOltData(olt) {
 
             if (olt.type === 'nokia') {
                 isOnline = (columns[4] || '').trim().toLowerCase().includes('up');
-                if (columns[0] && columns[0].includes('1/1/')) {
-                    const parts = columns[0].split('/');
-                    if (parts.length >= 4) { placa = parts[2]; porta = parts[3]; }
+                if (columns[0]) {
+                    const match = columns[0].match(/(\d+)\/(\d+)\/(\d+)\/(\d+)/);
+                    if (match) { 
+                        placa = match[3]; 
+                        porta = match[4]; 
+                    }
                 }
             } else { 
                 isOnline = (columns[2] || '').trim().toLowerCase() === 'active';
@@ -75,15 +41,16 @@ async function fetchGlobalOltData(olt) {
                         const parts = columns[0].split('/');
                         if (parts.length >= 2) { placa = parts[0]; porta = parts[1]; }
                     } else { 
-                        const match = columns[0].match(/GPON(\d+)\/(\d+)/);
+                        const match = columns[0].match(/GPON\s*(\d+)\/(\d+)/i);
                         if (match) { placa = match[1]; porta = match[2]; }
                     }
                 }
             }
 
             if (isOnline) totalOnline++; else totalOffline++;
+            
             if (placa && porta) {
-                const portKey = `${placa}/${porta}`;
+                const portKey = `${placa}/${porta}`; 
                 if (!portData[portKey]) portData[portKey] = { off: 0, total: 0 };
                 portData[portKey].total++;
                 if (!isOnline) portData[portKey].off++;
@@ -102,87 +69,103 @@ function updateGlobalNetworkCard(globalOnline, globalOffline, nokiaOnline, nokia
     
     const total = globalOnline + globalOffline;
     
+    // VISÃO GERAL: Ajuste das margens e gaps (reduzidos)
     const statsHtml = `
-        <div class="stat-item global-stat">
-            <span class="stat-number">${total}</span>
-            <label><span class="material-symbols-rounded icon-total">router</span> Total Geral</label>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; width: 100%;">
+            <span class="material-symbols-rounded" style="color: var(--m3-color-success); font-size: 20px;">analytics</span>
+            <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Visão Geral</h3>
         </div>
-        <div class="stat-item online global-stat">
-            <span class="stat-number">${globalOnline}</span>
-            <label><span class="material-symbols-rounded icon-up">check_circle</span> Equipamentos Online</label>
+        <div class="stat-item" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-bottom: 10px; align-items: center;">
+            <span class="stat-number" style="font-size: 2.3rem; display: block; text-align: left;">${total}</span>
+            <label style="font-size: 1.4rem; opacity: 0.9; margin: 0; display: flex; align-items: center; gap: 8px;"><span class="material-symbols-rounded icon-total" style="font-size: 24px;">router</span> Total Geral</label>
         </div>
-        <div class="stat-item offline global-stat">
-            <span class="stat-number">${globalOffline}</span>
-            <label><span class="material-symbols-rounded icon-down">error</span> Equipamentos Offline</label>
+        <div class="stat-item online" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-bottom: 8px; align-items: center;">
+            <span class="stat-number" style="font-size: 1.8rem; display: block; text-align: left; color: var(--m3-color-success);">${globalOnline}</span>
+            <label style="font-size: 1.3rem; opacity: 0.9; margin: 0; display: flex; align-items: center; gap: 8px; color: var(--m3-color-success);"><span class="material-symbols-rounded icon-up" style="font-size: 22px;">check_circle</span> Total Online</label>
+        </div>
+        <div class="stat-item offline" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center;">
+            <span class="stat-number" style="font-size: 1.8rem; display: block; text-align: left; color: var(--m3-color-error);">${globalOffline}</span>
+            <label style="font-size: 1.3rem; opacity: 0.9; margin: 0; display: flex; align-items: center; gap: 8px; color: var(--m3-color-error);"><span class="material-symbols-rounded icon-down" style="font-size: 22px;">error</span> Total Offline</label>
         </div>
     `;
 
     const nokiaPct = nokiaTotal > 0 ? (nokiaOnline / nokiaTotal) * 100 : 0;
     const furukawaPct = furukawaTotal > 0 ? (furukawaOnline / furukawaTotal) * 100 : 0;
     
+    // POR FABRICANTE: Margens reduzidas
     const vendorHtml = `
-        <div style="display: flex; flex-direction: column; justify-content: center; gap: 25px; width: 100%; height: 100%;">
-            <div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <img src="imagens/nokia.png" alt="Nokia" style="max-height: 28px; width: auto; object-fit: contain;">
-                    <span class="stat-number" style="font-size: 1.4rem; width: auto;">${Math.round(nokiaPct)}%</span>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; width: 100%;">
+            <span class="material-symbols-rounded" style="color: var(--m3-color-success); font-size: 20px;">precision_manufacturing</span>
+            <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Por Fabricante</h3>
+        </div>
+        <div style="display: flex; flex-direction: column; justify-content: center; gap: 15px; width: 100%; flex: 1;">
+            <div style="width: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <img src="imagens/logos/nokia.png" alt="Nokia" style="max-height: 24px; width: auto; object-fit: contain;">
+                    <span class="stat-number" style="font-size: 1.3rem; width: auto;">${Math.round(nokiaPct)}%</span>
                 </div>
-                <div style="height: 14px; background: var(--m3-surface-container-high); border-radius: 7px; overflow: hidden;">
-                    <div style="height: 100%; width: ${nokiaPct}%; background: var(--m3-color-success); border-radius: 7px;"></div>
+                <div style="height: 12px; background: var(--m3-surface-container-high); border-radius: 6px; overflow: hidden; width: 100%;">
+                    <div style="height: 100%; width: ${nokiaPct}%; background: var(--m3-color-success); border-radius: 6px;"></div>
                 </div>
             </div>
-            <div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <img src="imagens/furukawa.png" alt="Furukawa" style="max-height: 28px; width: auto; object-fit: contain;">
-                    <span class="stat-number" style="font-size: 1.4rem; width: auto;">${Math.round(furukawaPct)}%</span>
+            <div style="width: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <img src="imagens/logos/furukawa.png" alt="Furukawa" style="max-height: 24px; width: auto; object-fit: contain;">
+                    <span class="stat-number" style="font-size: 1.3rem; width: auto;">${Math.round(furukawaPct)}%</span>
                 </div>
-                <div style="height: 14px; background: var(--m3-surface-container-high); border-radius: 7px; overflow: hidden;">
-                    <div style="height: 100%; width: ${furukawaPct}%; background: var(--m3-color-success); border-radius: 7px;"></div>
+                <div style="height: 12px; background: var(--m3-surface-container-high); border-radius: 6px; overflow: hidden; width: 100%;">
+                    <div style="height: 100%; width: ${furukawaPct}%; background: var(--m3-color-success); border-radius: 6px;"></div>
                 </div>
             </div>
         </div>
     `;
 
-    let rankingHtmlContent = '';
+    // RANKING OLTS: Margens e paddings reduzidos
+    let rankingHtmlContent = `
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; width: 100%;">
+            <span class="material-symbols-rounded" style="color: var(--m3-color-success); font-size: 20px;">warning</span>
+            <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Top 3 OLTs Críticas</h3>
+        </div>
+        <div style="flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+    `;
+    
     if (top3Olts.some(olt => olt.offline > 0)) {
         top3Olts.forEach((olt, index) => {
             if (olt.offline === 0) return;
             const offlinePct = olt.total > 0 ? (olt.offline / olt.total) * 100 : 0;
             rankingHtmlContent += `
-                <div style="margin-bottom: 18px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; align-items: baseline;">
-                        <strong style="color: var(--m3-on-surface); font-size: 1.2rem;">${index + 1}º ${olt.id}</strong>
-                        <span class="stat-number" style="font-size: 1.3rem; color: var(--m3-color-error); width: auto;">${olt.offline} OFF</span>
+                <div style="width: 100%; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px; align-items: baseline;">
+                        <strong style="color: var(--m3-on-surface); font-size: 1.1rem;">${index + 1}º ${olt.id}</strong>
+                        <span class="stat-number" style="font-size: 1.2rem; color: var(--m3-color-error); width: auto;">${olt.offline} OFF</span>
                     </div>
-                    <div style="height: 12px; background: var(--m3-surface-container-high); border-radius: 6px; overflow: hidden;">
-                        <div style="height: 100%; width: ${offlinePct}%; background: var(--m3-color-error); border-radius: 6px;"></div>
+                    <div style="height: 10px; background: var(--m3-surface-container-high); border-radius: 5px; overflow: hidden; width: 100%;">
+                        <div style="height: 100%; width: ${offlinePct}%; background: var(--m3-color-error); border-radius: 5px;"></div>
                     </div>
                 </div>
             `;
         });
     } else {
-        rankingHtmlContent = `<div style="text-align: center; color: var(--m3-color-success); font-weight: 700; margin-top: 15px; width: 100%;"><span class="material-symbols-rounded" style="font-size: 48px;">sentiment_very_satisfied</span><br>Rede 100% Online!</div>`;
+        rankingHtmlContent += `<div style="text-align: center; color: var(--m3-color-success); font-weight: 700; margin-top: 10px; width: 100%;"><span class="material-symbols-rounded" style="font-size: 40px;">sentiment_very_satisfied</span><br>Rede 100% Online!</div>`;
     }
+    rankingHtmlContent += `</div>`; 
 
+    // Padding lateral interno reduzido de 40/30 para 20/15
     cardBody.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: stretch; width: 100%; flex-wrap: wrap; gap: 20px;">
-            <div class="card-stats" style="padding-right: 0; min-width: 200px;">
-                ${statsHtml}
-            </div>
-            <div style="flex: 1; border-left: 1px solid var(--m3-outline); padding-left: 30px; display: flex; flex-direction: column; min-width: 250px;">
-                ${vendorHtml}
-            </div>
-            <div style="flex: 1; border-left: 1px solid var(--m3-outline); padding-left: 30px; display: flex; flex-direction: column; justify-content: center; min-width: 250px;">
-                <div style="display: flex; flex-direction: column; justify-content: center; width: 100%; height: 100%;">
-                    ${rankingHtmlContent}
-                </div>
-            </div>
+        <div class="card-stats" style="padding-right: 15px; min-width: 250px; align-items: flex-start !important; text-align: left !important;">
+            ${statsHtml}
+        </div>
+        <div style="flex: 1; border-left: 1px solid var(--m3-outline); padding-left: 20px; padding-right: 15px; display: flex; flex-direction: column; align-items: flex-start !important; text-align: left !important; min-width: 250px;">
+            ${vendorHtml}
+        </div>
+        <div style="flex: 1; border-left: 1px solid var(--m3-outline); padding-left: 20px; display: flex; flex-direction: column; align-items: flex-start !important; text-align: left !important; min-width: 250px;">
+            ${rankingHtmlContent}
         </div>
     `;
 }
 
 async function runGlobalNetworkOverview() {
-    const oltPromises = GLOBAL_OLT_LIST.map(olt => fetchGlobalOltData(olt));
+    const oltPromises = GLOBAL_MASTER_OLT_LIST.map(olt => fetchGlobalOltData(olt));
     const results = await Promise.all(oltPromises);
     
     let globalOnline = 0, globalOffline = 0;
@@ -248,10 +231,6 @@ async function runGlobalNetworkOverview() {
     window.NETWORK_BACKBONE_STORE = currentBackbones;
 }
 
-// ==============================================================================
-// MOTOR DE OLT (SUPER MODAL - FLUXO MD3: PLACAS -> PORTAS)
-// ==============================================================================
-
 window.stopOltMonitoring = function() {
     if (window.currentOltInterval) {
         clearInterval(window.currentOltInterval);
@@ -260,37 +239,16 @@ window.stopOltMonitoring = function() {
 };
 
 async function fetchCircuitosData() {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${ENGINE_SHEET_ID}/values/${TAB_CIRCUITOS}!A:AK?key=${ENGINE_API_KEY}`;
+    const range = `${TAB_CIRCUITOS}!A:AK`;
     try {
-        const response = await fetch(url);
-        if (!response.ok) return [];
-        const data = await response.json();
+        const data = await API.get(range);
         return data.values || [];
     } catch (e) { return []; }
 }
 
-function getCircuitInfo(rowsCircuitos, sheetTab, placa, porta, type) {
-    const colIndex = OLT_COLUMN_MAP[sheetTab];
-    if (colIndex === undefined) return "-";
-    if (!rowsCircuitos.length) return "-";
-
-    let rowIndex = -1;
-    const p = parseInt(porta);
-    const sl = parseInt(placa);
-
-    if (type === 'nokia') rowIndex = ((sl - 1) * 16) + (p - 1) + 1;
-    else if (type === 'furukawa-2') rowIndex = ((sl - 1) * 16) + (p - 1) + 1;
-    else if (type === 'furukawa-10') rowIndex = ((sl - 1) * 4) + (p - 1) + 1;
-
-    if (rowIndex > 0 && rowIndex < rowsCircuitos.length) {
-        return rowsCircuitos[rowIndex][colIndex] || "-";
-    }
-    return "-";
-}
-
 window.startOltMonitoring = function(config) {
     window.stopOltMonitoring(); 
-
+    
     if (!document.getElementById('detail-modal')) {
         const modalHTML = `
             <div id="detail-modal" class="modal-overlay" onclick="closeModal(event)">
@@ -316,9 +274,6 @@ window.startOltMonitoring = function(config) {
                         </div>
 
                         <div id="view-clients" style="display:none;">
-                            <div class="modal-section-title">
-                                <span id="circuit-title-text">Clientes do Circuito</span>
-                            </div>
                             <div class="filter-bar">
                                 <input type="text" id="search-input" class="filter-input" placeholder="Buscar (Nome, Serial...)" onkeyup="filterClients()">
                                 <select id="status-filter" class="filter-select" onchange="filterClients()"></select>
@@ -340,16 +295,11 @@ window.startOltMonitoring = function(config) {
     async function populateTables() {
         window.CURRENT_OLT_PORT_DATA = {}; 
         window.OLT_CLIENTS_DATA = {}; 
-
         const rangeOlt = `${config.id}!A:Z`; 
-        const urlOlt = `https://sheets.googleapis.com/v4/spreadsheets/${ENGINE_SHEET_ID}/values/${rangeOlt}?key=${ENGINE_API_KEY}`;
 
         try {
-            const [responseOlt, rowsCircuitos] = await Promise.all([fetch(urlOlt), fetchCircuitosData()]);
-            if (!responseOlt.ok) throw new Error('Falha API OLT');
-            const dataOlt = await responseOlt.json();
+            const [dataOlt, rowsCircuitos] = await Promise.all([API.get(rangeOlt), fetchCircuitosData()]);
 
-            // --- INÍCIO DA CAPTURA BLINDADA COM REGEX ---
             let datePart = '--/--/----';
             let timePart = '--:--:--';
             
@@ -357,7 +307,6 @@ window.startOltMonitoring = function(config) {
                 const firstRow = dataOlt.values[0];
                 let cellData = firstRow[10] ? String(firstRow[10]) : '';
                 
-                // Se K1 estiver vazio, procura na linha inteira
                 if (!cellData) {
                     for (let i = firstRow.length - 1; i >= 0; i--) {
                         let val = firstRow[i] ? String(firstRow[i]) : '';
@@ -369,7 +318,6 @@ window.startOltMonitoring = function(config) {
                 }
                 
                 if (cellData) {
-                    // Ignora qualquer texto e suga apenas os formatos numéricos puros
                     const dateMatch = cellData.match(/\d{2}\/\d{2}\/\d{2,4}/);
                     const timeMatch = cellData.match(/\d{2}:\d{2}(:\d{2})?/);
                     
@@ -382,7 +330,6 @@ window.startOltMonitoring = function(config) {
             const elTime = document.getElementById('olt-update-time');
             if (elDate) elDate.textContent = datePart;
             if (elTime) elTime.textContent = timePart;
-            // --- FIM DA CAPTURA BLINDADA ---
 
             const rowsOlt = (dataOlt.values || []).slice(1);
 
@@ -394,8 +341,8 @@ window.startOltMonitoring = function(config) {
                     const pon = columns[0];
                     const status = columns[4]; 
                     if (!pon || !status) return;
-                    const parts = pon.split('/'); 
-                    if (parts.length >= 4) { placa = parts[2]; porta = parts[3]; }
+                    const match = pon.match(/(\d+)\/(\d+)\/(\d+)\/(\d+)/);
+                    if (match) { placa = match[3]; porta = match[4]; }
                     isOnline = status.trim().toLowerCase().includes('up');
                 } else { 
                     const portStr = columns[0];
@@ -406,7 +353,7 @@ window.startOltMonitoring = function(config) {
                         const parts = portStr.split('/');
                         if (parts.length >= 2) { placa = parts[0]; porta = parts[1]; }
                     } else {
-                        const match = portStr.match(/GPON(\d+)\/(\d+)/);
+                        const match = portStr.match(/GPON\s*(\d+)\/(\d+)/i);
                         if (match) { placa = match[1]; porta = match[2]; }
                     }
                     isOnline = status.trim().toLowerCase() === 'active';
@@ -423,7 +370,7 @@ window.startOltMonitoring = function(config) {
                 }
 
                 if (!window.CURRENT_OLT_PORT_DATA[placaNum][portaNum]) {
-                    const infoExtra = getCircuitInfo(rowsCircuitos, config.id, placa, porta, config.type);
+                    const infoExtra = getGlobalCircuitInfo(rowsCircuitos, config.oltName || config.id, placa, porta, config.type);
                     window.CURRENT_OLT_PORT_DATA[placaNum][portaNum] = { online: 0, offline: 0, info: infoExtra };
                     window.OLT_CLIENTS_DATA[portKey] = [];
                 }
@@ -441,7 +388,6 @@ window.startOltMonitoring = function(config) {
                 window.OLT_CLIENTS_DATA[portKey].push(clientData);
             });
 
-            // Renderização Tela A
             const placasList = document.getElementById('olt-placas-list');
             if (placasList) placasList.innerHTML = '';
 
@@ -489,7 +435,6 @@ window.startOltMonitoring = function(config) {
                 }
             }
 
-            // Atualização Tela B
             const detalhesView = document.getElementById('olt-view-detalhes');
             if (detalhesView && detalhesView.style.display === 'block') {
                 const subtitle = document.getElementById('olt-placa-subtitle').innerText;
@@ -501,14 +446,12 @@ window.startOltMonitoring = function(config) {
 
         } catch (error) { 
             console.error('Erro na engine (populateTables):', error); 
-            const placasList = document.getElementById('olt-placas-list');
-            if (placasList) placasList.innerHTML = `<p style="color: #f87171; text-align: center; padding: 20px; grid-column: 1 / -1;">Erro ao carregar os dados da OLT. Verifique a conexão.</p>`;
         }
     }
 
     const runUpdate = async () => { await populateTables(); };
     runUpdate(); 
-    window.currentOltInterval = setInterval(runUpdate, ENGINE_REFRESH_SECONDS * 1000); 
+    window.currentOltInterval = setInterval(runUpdate, GLOBAL_REFRESH_SECONDS * 1000); 
 }
 
 window.openOltPlacaDetails = function(placa, oltType) {
@@ -590,7 +533,9 @@ window.openCircuitClients = function(placa, porta, circuitoNome, oltType) {
     const modalContent = document.querySelector('#detail-modal .modal-content');
     modalContent.classList.add('modal-large');     
 
-    document.getElementById('circuit-title-text').textContent = `Circuito: ${circuitoNome} (Placa ${placa}/Porta ${porta})`;
+    const textoCircuito = (circuitoNome && circuitoNome !== "-") ? ` - Circuito: ${circuitoNome}` : "";
+    document.getElementById('modal-title').textContent = `Placa ${placa} / Porta ${porta}${textoCircuito}`;
+
     document.getElementById('view-stats').style.display = 'none';
     document.getElementById('view-clients').style.display = 'block';
     document.getElementById('search-input').value = '';
@@ -608,7 +553,7 @@ window.openCircuitClients = function(placa, porta, circuitoNome, oltType) {
     const tbody = document.getElementById('clients-tbody');
     
     if (oltType === 'nokia') {
-        thead.innerHTML = `<tr><th>Posição/Serial</th><th>Tipo/Perfil</th><th>Status</th><th>Descrição 1</th><th>Descrição 2</th></tr>`;
+        thead.innerHTML = `<tr><th>Posição</th><th>Serial</th><th>Status</th><th>Descrição 1</th><th>Descrição 2</th></tr>`;
     } else {
         thead.innerHTML = `<tr><th>Posição</th><th>Status</th><th>Serial</th><th>Descrição</th></tr>`;
     }
@@ -662,9 +607,8 @@ window.filterClients = function() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const isHomePage = window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html');
-    if (isHomePage) {
+    if (checkIsHomePage()) {
         runGlobalNetworkOverview();
-        setInterval(runGlobalNetworkOverview, ENGINE_REFRESH_SECONDS * 1000);
+        setInterval(runGlobalNetworkOverview, GLOBAL_REFRESH_SECONDS * 1000);
     }
 });

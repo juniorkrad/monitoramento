@@ -90,47 +90,11 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
+    <script src="api-service.js"></script>
     <script src="layout.js"></script>
     <script src="notifications.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="energia-engine.js"></script> 
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            loadHeader({ title: "Alarmes de Energia", exactTitle: true });
-            loadFooter();
-
-            // Injeta a data/hora logo após o cabeçalho ser criado
-            setPageOpenTime();
-        });
-
-        // Função formatada com o padrão visual do layout.js (com segundos)
-        function setPageOpenTime() {
-            let timestampEl = document.getElementById('update-timestamp');
-            
-            if (timestampEl) {
-                const now = new Date();
-                const dataFormatada = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                const horaFormatada = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                
-                timestampEl.innerHTML = `
-                    <span class="material-symbols-rounded">calendar_today</span> ${dataFormatada}
-                    <span style="display: inline-block; width: 1px; height: 12px; background: rgba(255,255,255,0.3); margin: 0 5px;"></span>
-                    <span class="material-symbols-rounded">schedule</span> ${horaFormatada}
-                `;
-                timestampEl.style.color = 'var(--m3-on-surface-variant)';
-            }
-        }
-
-        function closeEnergyModal(event) {
-            if (event && event.target.id !== 'energy-detail-modal' && !event.target.classList.contains('close-modal')) return;
-            document.getElementById('energy-detail-modal').style.display = 'none';
-        }
-
-        function backToEnergyPlacas() {
-            document.getElementById('energy-view-detalhes').style.display = 'none';
-            document.getElementById('energy-view-placas').style.display = 'block';
-        }
-    </script>
 </body>
 </html>
