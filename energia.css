@@ -11,7 +11,7 @@
     margin-bottom: 24px;
     padding: 0; 
     overflow: hidden; 
-    border-radius: 24px !important; /* Arredondamento MD3 */
+    border-radius: 24px !important; 
     background-color: var(--m3-surface-container);
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
@@ -20,7 +20,7 @@
     flex: 0 0 280px; 
     padding: 25px;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
-    border-left: 6px solid #f87171; /* Destaque lateral mais robusto */
+    border-left: 6px solid #fbbf24; 
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -34,19 +34,21 @@
     flex-direction: column;
 }
 
-/* Barra de Progresso Tríplice */
-.triple-progress-bar {
-    height: 10px; 
-    width: 100%;
-    background: rgba(255,255,255,0.05);
-    border-radius: 5px;
+/* --- GRÁFICO DE BLOCOS DE DENSIDADE (OPÇÃO 5) --- */
+.opt5-container {
     display: flex;
-    overflow: hidden;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
     margin-top: 15px;
+    padding: 0 10px;
 }
-.bar-online { background-color: var(--m3-on-surface-variant); } 
-.bar-poweroff { background-color: #f87171; } 
-.bar-offline { background-color: var(--m3-color-warning); }
+
+.block {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
 
 /* Status Badges */
 .impact-badge {
@@ -59,6 +61,19 @@
 .impact-high { background: rgba(248, 113, 113, 0.15); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); }
 .impact-med { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
 .impact-low { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
+
+/* --- FORMATO QUADRADO/ARREDONDADO COMPACTO DOS BOTÕES --- */
+.card-header-button {
+    border-radius: 6px !important; 
+    padding: 4px 6px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-header-button span {
+    font-size: 18px !important;
+}
 
 /* ==========================================================================
    RESPONSIVIDADE
