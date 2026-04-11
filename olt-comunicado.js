@@ -1,7 +1,7 @@
 // ==============================================================================
 // olt-comunicado.js - Gerador de Imagem para Redes Sociais (Formato Stories 9:16)
 // Tema: Material Design Light / Cores do Projeto (Roxo) / Fundo Branco
-// Atualização: Inclusão do Fatiador Inteligente para múltiplas localidades no mesmo circuito.
+// Atualização: Paginação ajustada de 8 para 7 bairros por página para melhor layout vertical.
 // ==============================================================================
 
 window.gerarComunicadoSocialOffscreen = async function(event) {
@@ -22,17 +22,64 @@ window.gerarComunicadoSocialOffscreen = async function(event) {
             oltName = titleEl.innerText.replace('dns', '').trim();
         }
 
-        // Descobrir o tipo da OLT (necessário para calcular a linha na planilha de Bairros)
-        let oltType = 'nokia'; 
-        if (window.GLOBAL_MASTER_OLT_LIST) {
-            const config = window.GLOBAL_MASTER_OLT_LIST.find(o => 
-                (o.id && o.id.replace(/-/g, '') === oltName.replace(/-/g, '')) || 
-                (o.sheetTab && o.sheetTab.replace(/-/g, '') === oltName.replace(/-/g, ''))
-            );
-            if (config && config.type) oltType = config.type;
+        // NOVO: Função interna de PROCV (Busca linha por linha)
+        function buscarLocalidadeExata(rows, oltIdentifier, placa, porta) {
+            if (!rows || rows.length === 0) return null;
+
+            const cleanOlt = (oltIdentifier || "").toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+            // Mapeamento das colunas da aba LOCALIDADE (p = Porta, l = Localidade)
+            const colMap = {
+                'HEL1': { p: 0, l: 1 },
+                'HEL2': { p: 2, l: 3 },
+                'MGP': { p: 4, l: 5 },
+                'PQA1': { p: 6, l: 7 },
+                'PSV1': { p: 8, l: 9 },
+                'PSV7': { p: 10, l: 11 },
+                'SBO2': { p: 12, l: 13 },
+                'SBO3': { p: 14, l: 15 },
+                'SBO4': { p: 16, l: 17 },
+                'SB1': { p: 18, l: 19 },
+                'SB2': { p: 20, l: 21 },
+                'SB3': { p: 22, l: 23 },
+                'PQA2': { p: 24, l: 25 },
+                'PQA3': { p: 26, l: 27 },
+                'LTXV2': { p: 28, l: 29 },
+                'LTXV1': { p: 30, l: 31 },
+                'SBO1': { p: 32, l: 33 }
+            };
+
+            const map = colMap[cleanOlt];
+            if (!map) return null;
+
+            const targetPortStr = `${placa}/${porta}`; // Ex: "2/1"
+
+            // Varre a planilha linha por linha buscando a porta exata
+            for (let i = 0; i < rows.length; i++) {
+                let rowPort = rows[i][map.p];
+                if (!rowPort) continue;
+
+                // Limpa a string da planilha (remove GPON, espaços, etc)
+                let s = String(rowPort).replace(/gpon/i, '').replace(/\\/g, '/').trim();
+                s = s.replace(/[^0-9/]/g, ''); 
+
+                // Algumas OLTs tem formato 1/1/1/2, pegamos sempre Placa/Porta final
+                let parts = s.split('/');
+                if (parts.length >= 2) {
+                    let sl = parseInt(parts[parts.length - 2], 10);
+                    let pt = parseInt(parts[parts.length - 1], 10);
+                    if (`${sl}/${pt}` === targetPortStr) {
+                        return rows[i][map.l]; // Achou! Retorna a localidade.
+                    }
+                } else if (s === targetPortStr) {
+                    return rows[i][map.l];
+                }
+            }
+            return null; // Se não achar na coluna inteira, retorna nulo
         }
 
-        // 2. Extrair APENAS as Localidades (Bairros) das portas 100% caídas
+
+        // 2. Extrair EXCLUSIVAMENTE as Localidades (Bairros) das portas 100% caídas
         const localidadesAfetadasSet = new Set();
         const data = window.CURRENT_OLT_PORT_DATA || {}; 
 
@@ -46,27 +93,21 @@ window.gerarComunicadoSocialOffscreen = async function(event) {
                 if (total >= 5 && (pData.offline / total) === 1) {
                     let nomeLocalidade = null;
                     
-                    // Cruza os dados com a nova aba "LOCALIDADE"
-                    // Requer que window.GLOBAL_BAIRROS_DATA seja populado pelo seu arquivo de API!
-                    if (window.getGlobalBairroInfo && window.GLOBAL_BAIRROS_DATA) {
-                        nomeLocalidade = window.getGlobalBairroInfo(window.GLOBAL_BAIRROS_DATA, oltName, placa, porta, oltType);
+                    // Cruza os dados EXCLUSIVAMENTE usando o novo PROCV
+                    if (window.GLOBAL_BAIRROS_DATA) {
+                        nomeLocalidade = buscarLocalidadeExata(window.GLOBAL_BAIRROS_DATA, oltName, placa, porta);
                     }
                     
-                    // Fallback de Segurança: Se não encontrar o bairro (ou se a aba não foi carregada), usa o circuito
-                    if (!nomeLocalidade || nomeLocalidade.trim() === "" || nomeLocalidade.trim() === "-") {
-                        nomeLocalidade = pData.info.replace(/'/g, "").trim();
-                    }
-
-                    if (nomeLocalidade && nomeLocalidade !== "-") {
-                        // --- O FATIADOR INTELIGENTE ---
-                        // Divide a string se encontrar vírgula, barra ou a palavra "e" (com espaços)
-                        const partes = nomeLocalidade.split(/,|\/|\se\s/gi);
+                    // Se achou uma localidade válida (NÃO usa mais circuito como fallback)
+                    if (nomeLocalidade && nomeLocalidade.trim() !== "" && nomeLocalidade.trim() !== "-") {
+                        
+                        // Fatiador Inteligente
+                        const partes = nomeLocalidade.split(/\s*,\s*|\s*\/\s*|\s+e\s+/gi);
                         
                         partes.forEach(parte => {
                             const bairroLimpo = parte.trim();
-                            // Só adiciona se o pedaço não for vazio ou apenas um traço
                             if (bairroLimpo && bairroLimpo !== "-") {
-                                localidadesAfetadasSet.add(bairroLimpo); // O Set garante que não haverá repetições
+                                localidadesAfetadasSet.add(bairroLimpo); // O Set elimina duplicatas
                             }
                         });
                     }
@@ -78,7 +119,8 @@ window.gerarComunicadoSocialOffscreen = async function(event) {
         const bairros = Array.from(localidadesAfetadasSet).sort();
 
         // 3. Paginação (Limite de bairros por "Story")
-        const LIMITE_BAIRROS = 8;
+        // AJUSTE: Redução do limite de bairros por página de 8 para 7 para garantir espaçamento vertical e evitar que os itens toquem a borda inferior. Isso resultará em mais páginas, mas com um layout melhor.
+        const LIMITE_BAIRROS = 7;
         const paginasDeLista = Math.ceil(bairros.length / LIMITE_BAIRROS);
         const totalPaginas = bairros.length > 0 ? paginasDeLista + 1 : 1;
         
@@ -239,12 +281,20 @@ window.gerarComunicadoSocialOffscreen = async function(event) {
             let nomeArquivo = `Story_${oltName.replace(/[^a-zA-Z0-9-]/g, '_')}_${new Date().getTime()}`;
             if (totalPaginas > 1) nomeArquivo += `_Pag${paginaAtual}`;
 
+            // Criar Link de Download
             const link = document.createElement('a');
             link.download = `${nomeArquivo}.png`;
             link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link); // Anexa ao DOM
             link.click();
+            document.body.removeChild(link); // Limpa o DOM
             
             document.body.removeChild(wrapperDiv);
+
+            // TRAVA ANTI-BLOQUEIO DO NAVEGADOR
+            if (paginaAtual < totalPaginas) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
         }
 
     } catch (error) {
