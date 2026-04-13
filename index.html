@@ -31,48 +31,20 @@
 
             <div class="global-grid">
                 
-                <div class="global-card">
-                    <div class="card-header">
-                        <h3>
-                            <span class="material-symbols-rounded" style="color: var(--m3-color-success);">public</span> MONITORAMENTO DA REDE
-                        </h3>
-                        <a href="olt.html" class="card-header-button" title="Ver Painel Completo">
-                            <span class="material-symbols-rounded" style="font-size: 22px;">open_in_new</span>
-                        </a>
-                    </div>
-                    <div class="card-body" id="card-global">
-                        <div class="card-body" style="width: 100%;">
-                            <p style="color: var(--m3-on-surface-variant);">Conectando aos equipamentos...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="global-card">
-                    <div class="card-header">
-                        <h3>
-                            <span class="material-symbols-rounded" style="color: #fbbf24;">bolt</span> MONITORAMENTO DE ENERGIA
-                        </h3>
-                        <a href="energia.html" class="card-header-button" title="Ver Painel Completo">
-                            <span class="material-symbols-rounded" style="font-size: 22px;">open_in_new</span>
-                        </a>
-                    </div>
-                    <div class="card-body" id="global-energia-body">
-                        <p style="color: var(--m3-on-surface-variant);">Calculando taxa de falha de energia (Dying Gasp)...</p>
-                    </div>
-                </div>
-
                 <div class="split-grid">
                     <div class="global-card">
                         <div class="card-header">
                             <h3>
-                                <span class="material-symbols-rounded" style="color: #60a5fa;">router</span> MONITORAMENTO DE EQUIPAMENTOS
+                                <span class="material-symbols-rounded" style="color: var(--m3-color-success);">public</span> MONITORAMENTO DA REDE
                             </h3>
-                            <a href="equipamentos.html" class="card-header-button" title="Ver Painel Completo">
+                            <a href="olt.html" class="card-header-button" title="Ver Painel Completo">
                                 <span class="material-symbols-rounded" style="font-size: 22px;">open_in_new</span>
                             </a>
                         </div>
-                        <div class="card-body" id="global-equipamentos-body">
-                            <p style="color: var(--m3-on-surface-variant);">Processando ranking de fabricantes...</p>
+                        <div class="card-body" id="card-global">
+                            <div class="card-body" style="width: 100%;">
+                                <p style="color: var(--m3-on-surface-variant);">Conectando aos equipamentos...</p>
+                            </div>
                         </div>
                     </div>
 
@@ -91,10 +63,53 @@
                     </div>
                 </div>
 
+                <div class="global-card">
+                    <div class="card-header">
+                        <h3>
+                            <span class="material-symbols-rounded" style="color: #fbbf24;">bolt</span> MONITORAMENTO DE ENERGIA
+                        </h3>
+                        <a href="energia.html" class="card-header-button" title="Ver Painel Completo">
+                            <span class="material-symbols-rounded" style="font-size: 22px;">open_in_new</span>
+                        </a>
+                    </div>
+                    <div class="card-body" id="global-energia-body">
+                        <p style="color: var(--m3-on-surface-variant);">Calculando taxa de falha de energia (Dying Gasp)...</p>
+                    </div>
+                </div>
+
+                <div class="global-card">
+                    <div class="card-header">
+                        <h3>
+                            <span class="material-symbols-rounded" style="color: #f97316;">device_thermostat</span> MONITORAMENTO TÉRMICO
+                        </h3>
+                        <a href="temperatura.html" class="card-header-button" title="Ver Painel Completo">
+                            <span class="material-symbols-rounded" style="font-size: 22px;">open_in_new</span>
+                        </a>
+                    </div>
+                    <div class="card-body" id="global-temperatura-body">
+                        <p style="color: var(--m3-on-surface-variant);">Processando dados térmicos e ranking de sensores...</p>
+                    </div>
+                </div>
+
+                <div class="global-card">
+                    <div class="card-header">
+                        <h3>
+                            <span class="material-symbols-rounded" style="color: #60a5fa;">router</span> MONITORAMENTO DE EQUIPAMENTOS
+                        </h3>
+                        <a href="equipamentos.html" class="card-header-button" title="Ver Painel Completo">
+                            <span class="material-symbols-rounded" style="font-size: 22px;">open_in_new</span>
+                        </a>
+                    </div>
+                    <div class="card-body" id="global-equipamentos-body">
+                        <p style="color: var(--m3-on-surface-variant);">Processando fabricantes...</p>
+                    </div>
+                </div>
+
             </div>
 
             <div id="energy-olt-grid" style="display: none;"></div>
             <div id="potencia-grid" style="display: none;"></div>
+            <div id="temperatura-grid" style="display: none;"></div>
 
         </main>
     </div>
@@ -111,6 +126,7 @@
     <script src="energia-engine.js"></script>
     <script src="equipamentos-engine.js"></script>
     <script src="potencia-engine.js"></script>
+    <script src="temperatura-engine.js"></script>
     <script src="home-engine.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

@@ -49,7 +49,7 @@
     width: 100%;
 }
 
-/* Layout dividido para Equipamentos e Potência */
+/* Layout dividido para Equipamentos e Potência / Rede e Potência */
 .split-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -123,6 +123,365 @@
 .mobile-break-separator { display: inline; }
 .mobile-break-line { display: inline; }
 
+/* ==========================================================================
+   TOP 3 OLTs POTÊNCIA (HOME) 
+   ========================================================================== */
+.potencia-top-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+}
+
+.potencia-top-card {
+    position: relative; 
+    background-color: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 12px 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: transform 0.2s, background-color 0.2s;
+    cursor: default;
+}
+
+.potencia-top-card:hover {
+    transform: translateY(-2px);
+    background-color: rgba(255,255,255,0.05);
+}
+
+.potencia-top-card .pot-olt-name {
+    font-size: 0.95rem;
+    color: var(--m3-on-surface);
+    font-weight: 700;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.potencia-top-card .pot-olt-media {
+    font-family: var(--font-family-mono);
+    font-size: 1.35rem; 
+    font-weight: 700;
+    line-height: 1;
+}
+
+.pot-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--m3-surface-container-high);
+    color: var(--m3-on-surface);
+    text-align: left;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--m3-outline);
+    z-index: 100;
+    width: max-content;
+    box-shadow: 0px 8px 24px rgba(0,0,0,0.6);
+    transition: opacity 0.2s, visibility 0.2s, bottom 0.2s;
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.pot-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -6px;
+    border-width: 6px;
+    border-style: solid;
+    border-color: var(--m3-outline) transparent transparent transparent;
+}
+
+.potencia-top-card:hover .pot-tooltip {
+    visibility: visible;
+    opacity: 1;
+    bottom: 120%;
+}
+
+.pot-tooltip-title {
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    color: var(--m3-on-surface);
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pot-tooltip-line {
+    margin: 5px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+
+/* ==========================================================================
+   GRID DE MINI-TERMÔMETROS (TEMPERATURA HOME) - ALINHADO À ESQUERDA
+   ========================================================================== */
+.temp-badge-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* Alinhado à esquerda conforme solicitado */
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.temp-badge-item {
+    position: relative; 
+    flex: 0 1 calc(11.11% - 8px); 
+    min-width: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-sizing: border-box;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    cursor: default;
+}
+
+.temp-badge-item:hover {
+    transform: translateY(-2px);
+}
+
+.temp-badge-item .olt-name {
+    color: var(--m3-on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.temp-badge-item .temp-value {
+    font-family: var(--font-family-mono);
+    font-size: 1.1rem;
+}
+
+.temp-badge-item .material-symbols-rounded {
+    transition: transform 0.3s ease;
+}
+.temp-badge-item.status-critico .material-symbols-rounded {
+    animation: pulse-fire 1.2s infinite alternate;
+}
+@keyframes pulse-fire {
+    0% { transform: scale(1); opacity: 0.8; text-shadow: 0 0 2px rgba(248, 113, 113, 0.4); }
+    100% { transform: scale(1.2); opacity: 1; text-shadow: 0 0 8px rgba(248, 113, 113, 1); }
+}
+
+.temp-badge-item.status-normal { background-color: rgba(255,255,255,0.03); }
+.temp-badge-item.status-normal .temp-value, .temp-badge-item.status-normal .material-symbols-rounded { color: #4ade80; }
+
+.temp-badge-item.status-atencao { background-color: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.3); }
+.temp-badge-item.status-atencao .temp-value, .temp-badge-item.status-atencao .material-symbols-rounded { color: #f97316; }
+
+.temp-badge-item.status-critico { background-color: rgba(248, 113, 113, 0.15); border-color: rgba(248, 113, 113, 0.3); }
+.temp-badge-item.status-critico .temp-value, .temp-badge-item.status-critico .material-symbols-rounded { color: #f87171; }
+
+.temp-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--m3-surface-container-high);
+    color: var(--m3-on-surface);
+    text-align: left;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--m3-outline);
+    z-index: 100;
+    width: max-content;
+    box-shadow: 0px 8px 24px rgba(0,0,0,0.6);
+    transition: opacity 0.2s, visibility 0.2s, bottom 0.2s;
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.temp-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -6px;
+    border-width: 6px;
+    border-style: solid;
+    border-color: var(--m3-outline) transparent transparent transparent;
+}
+
+.temp-badge-item:hover .temp-tooltip {
+    visibility: visible;
+    opacity: 1;
+    bottom: 135%;
+}
+
+.temp-tooltip-title {
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    color: var(--m3-on-surface);
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.temp-tooltip-line {
+    margin: 5px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+/* ==========================================================================
+   GRID DE FABRICANTES (EQUIPAMENTOS HOME) - 6 CARDS POR LINHA COM LOGOS
+   ========================================================================== */
+.eqp-badge-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); /* Força exatos 6 itens por linha */
+    gap: 12px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.eqp-badge-item {
+    position: relative;
+    background-color: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    cursor: default;
+}
+
+.eqp-badge-item:hover {
+    transform: translateY(-2px);
+    background-color: rgba(255,255,255,0.06);
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+/* Estilização da Logo da Fabricante */
+.eqp-logo-img {
+    max-height: 24px;
+    max-width: 90%;
+    object-fit: contain;
+    margin-bottom: 8px;
+    transition: opacity 0.2s, filter 0.2s;
+}
+
+.eqp-badge-item.disabled .eqp-logo-img {
+    opacity: 0.25; /* Apagado se o total for 0 */
+    filter: grayscale(100%);
+}
+
+.eqp-logo-text {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--m3-on-surface);
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.eqp-total-value {
+    font-family: var(--font-family-mono);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #60a5fa; 
+    line-height: 1;
+}
+
+.eqp-badge-item.disabled .eqp-total-value {
+    color: var(--m3-on-surface-variant);
+    opacity: 0.5;
+}
+
+/* Tooltip de Equipamentos */
+.eqp-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--m3-surface-container-high);
+    color: var(--m3-on-surface);
+    text-align: left;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--m3-outline);
+    z-index: 100;
+    width: max-content;
+    box-shadow: 0px 8px 24px rgba(0,0,0,0.6);
+    transition: opacity 0.2s, visibility 0.2s, bottom 0.2s;
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.eqp-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -6px;
+    border-width: 6px;
+    border-style: solid;
+    border-color: var(--m3-outline) transparent transparent transparent;
+}
+
+.eqp-badge-item:hover .eqp-tooltip {
+    visibility: visible;
+    opacity: 1;
+    bottom: 120%;
+}
+
+.eqp-tooltip-title {
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    color: var(--m3-on-surface);
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.eqp-tooltip-line {
+    margin: 5px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+
 /* RESPONSIVIDADE EXCLUSIVA DA HOME (MÓVEL & TABLETS) */
 @media (max-width: 900px) {
     .split-grid {
@@ -148,7 +507,6 @@
         text-align: left !important;
     }
 
-    /* Linhas separadoras removidas para o Mobile, conforme solicitado */
     .global-card div[style*="flex: 1"] {
         border-top: none !important;
     }
@@ -158,7 +516,17 @@
         margin-top: 15px !important;
     }
 
-    /* Quebra de linha exclusiva para o Mobile (Serial e Código) */
+    .temp-badge-grid {
+        justify-content: flex-start; 
+    }
+    .temp-badge-item {
+        flex: 1 1 calc(33% - 8px); 
+    }
+    
+    .eqp-badge-grid {
+        grid-template-columns: repeat(3, 1fr); /* 3 colunas de logotipos no mobile */
+    }
+
     .mobile-break-separator {
         display: none !important;
     }
