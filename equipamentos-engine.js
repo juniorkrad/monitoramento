@@ -1,6 +1,6 @@
 // ==============================================================================
 // equipamentos-engine.js - Motor de Fabricantes (Visão por Marca)
-// Atualização: Cards da página agora são baseados nos Fabricantes.
+// Atualização: Responsividade nas imagens duplas para evitar corte de tela
 // ==============================================================================
 
 const EQP_MARCAS = [
@@ -24,11 +24,27 @@ EQP_MARCAS.forEach(marca => {
     });
 });
 
-function getLogoFilename(nome) {
-    if (nome === 'MAXPRINT / V-SOL') return 'v-sol.png';
-    if (nome === 'CHINA MOBILE') return 'china-mobile.png';
-    if (nome === 'DESCONHECIDOS') return 'desconhecidos.png';
-    return nome.toLowerCase().replace(/\s+/g, '-') + '.png';
+window.BRAND_OLT_HTML = {}; 
+
+function getLogoHtml(nome) {
+    if (nome === 'MAXPRINT / V-SOL') {
+        // Uso rigoroso de max-width e wrap no Flex para espremer as imagens mantendo-as dentro do card
+        return `
+            <div style="display: flex; gap: 6px; align-items: center; justify-content: center; width: 100%; flex-wrap: nowrap; margin-bottom: 8px;">
+                <img src="imagens/logos/maxprint.png" alt="Maxprint" style="max-height: 24px; max-width: 42%; object-fit: contain; transition: opacity 0.2s, filter 0.2s;" onerror="this.style.display='none';">
+                <span style="color: var(--m3-on-surface-variant); font-size: 12px; font-weight: bold;">/</span>
+                <img src="imagens/logos/v-sol.png" alt="V-SOL" style="max-height: 24px; max-width: 42%; object-fit: contain; transition: opacity 0.2s, filter 0.2s;" onerror="this.style.display='none';">
+            </div>
+        `;
+    }
+    
+    let logoFile = nome.toLowerCase().replace(/\s+/g, '-') + '.png';
+    if (nome === 'CHINA MOBILE') logoFile = 'china-mobile.png';
+    if (nome === 'DESCONHECIDOS') logoFile = 'desconhecidos.png';
+
+    // Logo simples controlada diretamente
+    return `<img src="imagens/logos/${logoFile}" class="eqp-logo-img" alt="${nome}" style="max-height: 24px; max-width: 90%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <span class="eqp-logo-text" style="display: none; color: var(--m3-on-surface); font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">${nome}</span>`;
 }
 
 async function runEquipamentosEngine() {
@@ -39,10 +55,10 @@ async function runEquipamentosEngine() {
     if (!globalBody && !isEqpPage) return;
 
     try {
-        let brandData = {}; // Estrutura: { 'NOKIA': { total, online, offline, olts: { 'HEL-1': 10 } } }
+        let brandData = {}; 
         let listaDesconhecidos = [];
+        window.BRAND_OLT_HTML = {}; 
 
-        // Inicializa
         const todasMarcas = [...EQP_MARCAS.map(m => m.nome), 'DESCONHECIDOS'];
         todasMarcas.forEach(m => {
             brandData[m] = { total: 0, online: 0, offline: 0, olts: {} };
@@ -79,34 +95,64 @@ async function runEquipamentosEngine() {
                     listaDesconhecidos.push({ olt: olt.id, pon: porta, serial: serial, isOnline: isOnline });
                 }
 
-                // Incrementa Globais da Marca
                 brandData[marca].total++;
                 if (isOnline) brandData[marca].online++;
                 else brandData[marca].offline++;
 
-                // Incrementa Breakdown por OLT
                 if (!brandData[marca].olts[olt.id]) brandData[marca].olts[olt.id] = 0;
                 brandData[marca].olts[olt.id]++;
             });
         });
 
         // ==============================================================================
-        // INJEÇÃO NA HOME (Mantida conforme layout anterior)
+        // INJEÇÃO NA HOME
         // ==============================================================================
         if (globalBody) {
             let eqpHtml = `<div class="eqp-badge-grid">`;
             todasMarcas.map(nome => ({ nome, ...brandData[nome] }))
                 .sort((a, b) => b.total - a.total)
                 .forEach(marca => {
-                    const logoFile = getLogoFilename(marca.nome);
                     const color = marca.nome === 'DESCONHECIDOS' ? '#f87171' : '#60a5fa';
                     const disabledClass = marca.total === 0 ? 'disabled' : '';
+                    const pctOnline = marca.total > 0 ? ((marca.online / marca.total) * 100).toFixed(1) : 0;
+                    
+                    const marcaInfo = EQP_MARCAS.find(em => em.nome === marca.nome);
+                    const prefixosTxt = marcaInfo ? marcaInfo.prefixos : 'Não Mapeado';
+
+                    let tooltipHtml = `
+                        <div class="eqp-tooltip">
+                            <div class="eqp-tooltip-title">
+                                <span class="material-symbols-rounded" style="font-size: 18px; color: ${color};">router</span>
+                                ${marca.nome}
+                            </div>
+                            <div class="eqp-tooltip-line">
+                                <span style="color: var(--m3-on-surface-variant);">Prefixos:</span> 
+                                <strong style="font-family: var(--font-family-mono); font-size: 0.75rem;">${prefixosTxt}</strong>
+                            </div>
+                            <div class="eqp-tooltip-line">
+                                <span style="color: var(--m3-on-surface-variant);">Total na Rede:</span> 
+                                <strong>${marca.total}</strong>
+                            </div>
+                            <div class="eqp-tooltip-line">
+                                <span style="color: var(--m3-on-surface-variant);">Online:</span> 
+                                <strong style="color: #4ade80;">${marca.online}</strong>
+                            </div>
+                            <div class="eqp-tooltip-line">
+                                <span style="color: var(--m3-on-surface-variant);">Offline:</span> 
+                                <strong style="color: #f87171;">${marca.offline}</strong>
+                            </div>
+                            <div class="eqp-tooltip-line">
+                                <span style="color: var(--m3-on-surface-variant);">Saúde:</span> 
+                                <strong>${pctOnline}%</strong>
+                            </div>
+                        </div>
+                    `;
 
                     eqpHtml += `
                         <div class="eqp-badge-item ${disabledClass}">
-                            <img src="imagens/logos/${logoFile}" class="eqp-logo-img" alt="${marca.nome}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                            <span class="eqp-logo-text" style="display: none;">${marca.nome}</span>
-                            <span class="eqp-total-value">${marca.total}</span>
+                            ${getLogoHtml(marca.nome)}
+                            <span class="eqp-total-value" style="margin-top: 2px;">${marca.total}</span>
+                            ${tooltipHtml}
                         </div>
                     `;
                 });
@@ -115,34 +161,47 @@ async function runEquipamentosEngine() {
         }
 
         // ==============================================================================
-        // INJEÇÃO NA PÁGINA EQUIPAMENTOS (Agora por FABRICANTE)
+        // INJEÇÃO NA PÁGINA EQUIPAMENTOS
         // ==============================================================================
         if (isEqpPage && gridEqpPage) {
             gridEqpPage.innerHTML = '';
 
             todasMarcas.map(nome => ({ nome, ...brandData[nome] }))
-                .filter(m => m.total > 0) // Só mostra marcas que existem na rede
+                .filter(m => m.total > 0) 
                 .sort((a, b) => b.total - a.total)
                 .forEach(m => {
-                    const logoFile = getLogoFilename(m.nome);
                     const health = ((m.online / m.total) * 100).toFixed(1);
+                    
+                    const marcaInfo = EQP_MARCAS.find(em => em.nome === m.nome);
+                    const prefixosTxt = marcaInfo ? marcaInfo.prefixos : 'Não Mapeado';
 
-                    // Monta a lista de OLTs
                     let oltListHtml = '';
                     Object.keys(m.olts).sort().forEach(oltId => {
                         oltListHtml += `
-                            <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.85rem;">
+                            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.9rem;">
                                 <span style="color:var(--m3-on-surface-variant)">${oltId}</span>
                                 <strong style="font-family:var(--font-family-mono)">${m.olts[oltId]}</strong>
                             </div>
                         `;
                     });
+                    window.BRAND_OLT_HTML[m.nome] = oltListHtml; 
+
+                    let headerButtonHtml = '';
+                    if (m.nome === 'DESCONHECIDOS') {
+                        headerButtonHtml = `
+                            <button class="card-header-button" onclick="openUnknownModal()" title="Ver Detalhes">
+                                <span class="material-symbols-rounded" style="font-size: 22px;">manage_search</span>
+                            </button>
+                        `;
+                    }
 
                     gridEqpPage.innerHTML += `
                         <div class="overview-card" style="display:flex; flex-direction:column;">
-                            <div class="card-header" style="justify-content:center; padding:15px;">
-                                <img src="imagens/logos/${logoFile}" style="max-height:30px; max-width:80%; object-fit:contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                                <h3 style="display:none; margin:0;">${m.nome}</h3>
+                            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; padding:15px 20px;">
+                                <div style="display:flex; align-items:center; justify-content:center; flex:1;">
+                                    ${getLogoHtml(m.nome)}
+                                </div>
+                                ${headerButtonHtml}
                             </div>
                             <div class="card-body" style="flex-direction:column; padding:20px; gap:15px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
@@ -154,6 +213,11 @@ async function runEquipamentosEngine() {
                                         <span style="font-size:1.5rem; font-weight:700; color:${health >= 95 ? 'var(--m3-color-success)' : '#fbbf24'}; font-family:var(--font-family-mono);">${health}%</span><br>
                                         <span style="font-size:0.7rem; color:var(--m3-on-surface-variant); text-transform:uppercase;">Saúde</span>
                                     </div>
+                                </div>
+
+                                <div style="width: 100%; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 6px; text-align: center; margin-top: -5px; box-sizing: border-box;">
+                                    <span style="font-size:0.7rem; color:var(--m3-on-surface-variant); text-transform:uppercase; margin-right: 5px;">Prefixos:</span>
+                                    <span style="font-family:var(--font-family-mono); font-size:0.8rem; color:var(--m3-on-surface); font-weight:bold;">${prefixosTxt}</span>
                                 </div>
 
                                 <div style="display:flex; gap:10px; width:100%;">
@@ -168,9 +232,11 @@ async function runEquipamentosEngine() {
                                 </div>
 
                                 <div style="width:100%; margin-top:5px;">
-                                    <span style="font-size:0.75rem; color:var(--m3-on-surface-variant); font-weight:700; display:block; margin-bottom:8px; border-bottom:1px solid var(--m3-outline); padding-bottom:4px;">DISTRIBUIÇÃO POR OLT</span>
-                                    <div class="custom-scroll" style="max-height:150px; overflow-y:auto; padding-right:5px;">
-                                        ${oltListHtml}
+                                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--m3-outline); padding-bottom:4px;">
+                                        <span style="font-size:0.75rem; color:var(--m3-on-surface-variant); font-weight:700; text-transform:uppercase;">DISTRIBUIÇÃO POR OLT</span>
+                                        <button onclick="openDistribuicaoModal('${m.nome}')" style="background:transparent; border:none; color:var(--m3-on-surface-variant); cursor:pointer; display:flex; align-items:center; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--m3-on-surface)'" onmouseout="this.style.color='var(--m3-on-surface-variant)'" title="Ver Distribuição Detalhada">
+                                            <span class="material-symbols-rounded" style="font-size: 18px;">open_in_new</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -178,20 +244,23 @@ async function runEquipamentosEngine() {
                     `;
                 });
 
-            // Tabela de Desconhecidos (Mantida no final da página)
             const tbody = document.querySelector('#tabela-desconhecidos tbody');
             if (tbody) {
                 tbody.innerHTML = '';
-                listaDesconhecidos.sort((a, b) => a.olt.localeCompare(b.olt)).forEach(item => {
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${item.olt}</strong></td>
-                            <td>${item.pon || '-'}</td>
-                            <td style="font-family: var(--font-family-mono);">${item.serial}</td>
-                            <td><span class="status ${item.isOnline ? 'status-normal' : 'status-problema'}">${item.isOnline ? 'Online' : 'Offline'}</span></td>
-                        </tr>
-                    `;
-                });
+                if (listaDesconhecidos.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--m3-on-surface-variant);">Nenhum equipamento desconhecido encontrado.</td></tr>`;
+                } else {
+                    listaDesconhecidos.sort((a, b) => a.olt.localeCompare(b.olt)).forEach(item => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><strong>${item.olt}</strong></td>
+                                <td>${item.pon || '-'}</td>
+                                <td style="font-family: var(--font-family-mono);">${item.serial}</td>
+                                <td><span class="status ${item.isOnline ? 'status-normal' : 'status-problema'}">${item.isOnline ? 'Online' : 'Offline'}</span></td>
+                            </tr>
+                        `;
+                    });
+                }
             }
         }
 
@@ -200,6 +269,41 @@ async function runEquipamentosEngine() {
     }
 }
 
+// ==============================================================================
+// FUNÇÕES DE CONTROLE DOS MODAIS
+// ==============================================================================
+window.openUnknownModal = function() {
+    const modal = document.getElementById('modal-desconhecidos');
+    if (modal) modal.style.display = 'flex';
+};
+
+window.closeUnknownModal = function(event) {
+    if (event && event.target.id !== 'modal-desconhecidos' && !event.target.classList.contains('close-modal')) return;
+    const modal = document.getElementById('modal-desconhecidos');
+    if (modal) modal.style.display = 'none';
+};
+
+window.openDistribuicaoModal = function(marca) {
+    const modal = document.getElementById('modal-distribuicao');
+    const titulo = document.getElementById('distribuicao-marca-titulo');
+    const container = document.getElementById('distribuicao-lista-container');
+
+    if (modal && titulo && container) {
+        titulo.innerText = marca;
+        container.innerHTML = window.BRAND_OLT_HTML[marca] || '<p style="text-align:center; color:var(--m3-on-surface-variant);">Sem dados de distribuição para este fabricante.</p>';
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeDistribuicaoModal = function(event) {
+    if (event && event.target.id !== 'modal-distribuicao' && !event.target.classList.contains('close-modal')) return;
+    const modal = document.getElementById('modal-distribuicao');
+    if (modal) modal.style.display = 'none';
+};
+
+// ==============================================================================
+// INICIALIZAÇÃO
+// ==============================================================================
 document.addEventListener('DOMContentLoaded', () => {
     const isEqpPage = window.location.pathname.includes('equipamentos.html');
     const isHomePage = window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html');
@@ -207,6 +311,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isEqpPage) {
         if (typeof loadHeader === 'function') loadHeader({ title: "Equipamentos por Fabricante", exactTitle: true });
         if (typeof loadFooter === 'function') loadFooter();
+        
+        setTimeout(updateGlobalTimestamp, 500); 
     }
 
     if (isEqpPage || isHomePage) {
