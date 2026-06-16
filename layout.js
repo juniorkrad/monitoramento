@@ -1,5 +1,5 @@
 // ==============================================================================
-// layout.js - Construtor de Layout e Menu Inteligente (Com Busca de Serial Integrada)
+// layout.js - Construtor de Layout e Menu Inteligente (Com Busca e Emergência Autenticada)
 // ==============================================================================
 
 (function loadIconFont() {
@@ -30,7 +30,8 @@ function loadHeader(config) {
     `;
     
     loadSidebar(currentPage);
-    injectSearchModal(); // Injeta o Pop-up na página
+    injectSearchModal(); // Injeta Modal de Busca
+    injectEmergencyModal(); // Injeta Modal de Emergência
 
     headerPlaceholder.innerHTML = `
         <header class="header">
@@ -106,6 +107,11 @@ function loadSidebar(currentPage) {
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px; color: var(--m3-primary);">manage_search</span>
                     BUSCAR SERIAL
                 </a>
+
+                <a href="#" onclick="checkAuthAndOpenEmergency(); return false;" class="sidebar-link home-highlight bg-danger-highlight text-danger" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
+                    <span class="material-symbols-rounded text-danger" style="font-size: 24px; margin-right: 12px;">warning</span>
+                    COLETA DE EMERGÊNCIA
+                </a>
             </nav>
         </div>
     `;
@@ -175,7 +181,6 @@ function openSearchModal() {
     document.getElementById('search-results-area').innerHTML = '';
     setTimeout(() => document.getElementById('serial-search-input').focus(), 100);
     
-    // Fecha o menu lateral automaticamente
     const sidebar = document.getElementById('main-sidebar');
     if (sidebar && sidebar.classList.contains('active')) {
         toggleSidebar();
@@ -234,7 +239,6 @@ async function executeSerialSearch() {
                             let statusStr = "Desconhecido";
                             let statusClass = "status-unknown";
                             
-                            // BUSCA CIRÚRGICA DO STATUS POR FABRICANTE (Nokia = Índice 4, Furukawa = Índice 2)
                             let colStatus = (olt.type === 'nokia') ? 4 : 2;
                             let statusCell = row[colStatus] ? String(row[colStatus]).toUpperCase().trim() : '';
                             
@@ -275,12 +279,11 @@ async function executeSerialSearch() {
             return;
         }
 
-        // Renderiza os resultados limpos e minimalistas
         let html = '';
         foundResults.forEach(res => {
             html += `
                 <div class="search-result-card">
-                    <div class="search-result-row">
+                    <div class="search-result-card-row">
                         <span class="material-symbols-rounded">barcode</span>
                         <span class="search-result-val">${res.serial}</span>
                     </div>
@@ -309,7 +312,258 @@ async function executeSerialSearch() {
 }
 
 // ==============================================================================
-// UTILITÁRIOS GLOBAIS BLINDADOS
+// SISTEMA DE EMERGÊNCIA (GOOGLE LOGIN E COLETA ASSÍNCRONA)
+// ==============================================================================
+
+const OLT_EMERGENCY_MAP = {
+    'HEL-1': { row: 2, timeSecs: 300 }, 
+    'HEL-2': { row: 3, timeSecs: 240 }, 
+    'PQA-1': { row: 4, timeSecs: 300 }, 
+    'PSV-1': { row: 5, timeSecs: 300 }, 
+    'MGP':   { row: 6, timeSecs: 240 }, 
+    'SBO-1': { row: 7, timeSecs: 180 }, 
+    'SBO-2': { row: 8, timeSecs: 180 }, 
+    'SBO-3': { row: 9, timeSecs: 180 }, 
+    'SBO-4': { row: 10, timeSecs: 180 }, 
+    'PSV-7': { row: 11, timeSecs: 180 }, 
+    'LTXV-1':{ row: 12, timeSecs: 180 }, 
+    'LTXV-2':{ row: 13, timeSecs: 180 }, 
+    'PQA-2': { row: 14, timeSecs: 180 }, 
+    'PQA-3': { row: 15, timeSecs: 180 }, 
+    'SB-1':  { row: 16, timeSecs: 180 }, 
+    'SB-2':  { row: 17, timeSecs: 180 }, 
+    'SB-3':  { row: 18, timeSecs: 180 }
+};
+
+let emergencyInterval = null;
+let tokenClient;
+let gapiAccessToken = null;
+
+function checkAuthAndOpenEmergency() {
+    if (gapiAccessToken) {
+        openEmergencyModal();
+        return;
+    }
+
+    if (!window.google || !window.google.accounts) {
+        alert("A segurança do Google ainda está carregando ou o script não foi adicionado. Tente novamente em alguns segundos.");
+        return;
+    }
+
+    if (!tokenClient) {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: '310061647059-cl0o934un533jum0uka0t0fmnef5m211.apps.googleusercontent.com',
+            scope: 'https://www.googleapis.com/auth/spreadsheets',
+            callback: (tokenResponse) => {
+                if (tokenResponse && tokenResponse.access_token) {
+                    gapiAccessToken = tokenResponse.access_token;
+                    openEmergencyModal();
+                }
+            },
+        });
+    }
+    
+    tokenClient.requestAccessToken({prompt: ''}); 
+}
+
+function injectEmergencyModal() {
+    if (document.getElementById('emergency-action-modal')) return;
+
+    const modalHtml = `
+        <div class="search-modal-overlay" id="emergency-action-modal" onclick="closeEmergencyModal(event)">
+            <div class="search-modal" onclick="event.stopPropagation()">
+                <div class="search-modal-header emergency-header">
+                    <h2><span class="material-symbols-rounded">warning</span> Painel de Emergência</h2>
+                    <button class="search-close-btn" onclick="closeEmergencyModal()" title="Cancelar"><span class="material-symbols-rounded">close</span></button>
+                </div>
+                <div id="emergency-dynamic-area"></div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function openEmergencyModal() {
+    injectEmergencyModal();
+    const modal = document.getElementById('emergency-action-modal');
+    modal.classList.add('active');
+    
+    const sidebar = document.getElementById('main-sidebar');
+    if (sidebar && sidebar.classList.contains('active')) toggleSidebar();
+
+    renderEmergencySelection();
+}
+
+function closeEmergencyModal(event) {
+    if (event && event.target.id !== 'emergency-action-modal' && event.type === 'click') return;
+    const modal = document.getElementById('emergency-action-modal');
+    if (modal) modal.classList.remove('active');
+    
+    if(emergencyInterval) clearInterval(emergencyInterval);
+}
+
+function renderEmergencySelection() {
+    const area = document.getElementById('emergency-dynamic-area');
+    
+    if (typeof GLOBAL_MASTER_OLT_LIST === 'undefined') {
+        area.innerHTML = `<div style="text-align:center; color: var(--m3-error); padding: 20px;">Erro: Lista de OLTs não encontrada.</div>`;
+        return;
+    }
+
+    let cardsHtml = '';
+    GLOBAL_MASTER_OLT_LIST.forEach(olt => {
+        const displayId = olt.id || olt.sheetTab;
+        cardsHtml += `
+            <div class="emergency-card-btn" onclick="confirmEmergencyOlt('${displayId}')">
+                <span class="material-symbols-rounded">dns</span>
+                <span class="emergency-card-name">${displayId}</span>
+            </div>
+        `;
+    });
+
+    area.innerHTML = `
+        <p style="text-align: center; color: var(--m3-on-surface-variant); margin-bottom: 10px;">Selecione o equipamento que necessita de varredura prioritária local:</p>
+        <div class="emergency-grid">
+            ${cardsHtml}
+        </div>
+        <div style="text-align:center; margin-top: 15px; font-size: 0.8rem; color: #4ade80;">
+            <span class="material-symbols-rounded" style="font-size: 14px; vertical-align: middle;">verified_user</span> 
+            Sessão autenticada ativa. Suas ações serão registradas.
+        </div>
+    `;
+}
+
+function confirmEmergencyOlt(oltId) {
+    const area = document.getElementById('emergency-dynamic-area');
+    area.innerHTML = `
+        <div class="emergency-confirm-box">
+            <span class="material-symbols-rounded text-danger" style="font-size: 60px;">warning</span>
+            <div class="emergency-confirm-title">
+                Deseja realmente disparar a coleta de emergência no servidor local para a OLT:
+                <span class="emergency-confirm-highlight">${oltId}</span>
+            </div>
+            <div class="emergency-btn-group">
+                <button class="btn-cancel" onclick="renderEmergencySelection()">NÃO, VOLTAR</button>
+                <button class="btn-confirm-danger" onclick="executeEmergencySignal('${oltId}')">SIM, DISPARAR</button>
+            </div>
+        </div>
+    `;
+}
+
+async function executeEmergencySignal(oltId) {
+    const area = document.getElementById('emergency-dynamic-area');
+    const oltData = OLT_EMERGENCY_MAP[oltId];
+
+    if (!oltData) {
+        area.innerHTML = `<div class="emergency-confirm-box"><span class="text-danger">Erro de mapeamento para OLT ${oltId}.</span><br><button class="btn-cancel" style="margin-top:20px;" onclick="renderEmergencySelection()">VOLTAR</button></div>`;
+        return;
+    }
+
+    area.innerHTML = `
+        <div class="search-loading">
+            <div class="spinner"></div>
+            <span style="color: var(--m3-on-surface);">Autenticando e enviando sinal para Nuvem...</span>
+        </div>
+    `;
+
+    try {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GLOBAL_SHEET_ID}/values/CONTROLE!B${oltData.row}?valueInputOption=USER_ENTERED`;
+        
+        const payload = {
+            "range": `CONTROLE!B${oltData.row}`,
+            "majorDimension": "ROWS",
+            "values": [ ["COLETAR"] ]
+        };
+
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${gapiAccessToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error.message || "Erro de permissão na escrita.");
+        }
+
+        startEmergencyTimer(oltId, oltData.timeSecs);
+
+    } catch (error) {
+        console.error("Erro ao enviar sinal de emergência autenticado:", error);
+        area.innerHTML = `
+            <div class="emergency-confirm-box">
+                <span class="text-danger">Falha de Autorização ou Conexão.</span>
+                <p style="font-size: 0.85rem; color: var(--m3-on-surface-variant);">${error.message}</p>
+                <button class="btn-cancel" style="margin-top:20px;" onclick="renderEmergencySelection()">VOLTAR</button>
+            </div>`;
+    }
+}
+
+function startEmergencyTimer(oltId, totalSeconds) {
+    const area = document.getElementById('emergency-dynamic-area');
+    let timeLeft = totalSeconds;
+
+    function formatTime(secs) {
+        const m = Math.floor(secs / 60).toString().padStart(2, '0');
+        const s = (secs % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    area.innerHTML = `
+        <div class="emergency-confirm-box" style="gap: 10px;">
+            <span class="material-symbols-rounded text-danger" style="font-size: 40px; animation: textFlash 2s infinite;">sync</span>
+            <div style="font-size: 1.1rem; color: var(--m3-on-surface);">
+                Sinal enviado com sucesso para <b class="text-danger">${oltId}</b>!
+            </div>
+            <div style="font-size: 0.9rem; color: var(--m3-on-surface-variant); margin-bottom: 10px;">
+                O Servidor local já iniciou a coleta. Aguarde a finalização...
+            </div>
+            
+            <div class="emergency-timer-text" id="emergency-clock">${formatTime(timeLeft)}</div>
+            
+            <div class="emergency-progress-container">
+                <div class="emergency-progress-bar" id="emergency-bar"></div>
+            </div>
+        </div>
+    `;
+
+    if(emergencyInterval) clearInterval(emergencyInterval);
+
+    emergencyInterval = setInterval(() => {
+        timeLeft--;
+        
+        const clockEl = document.getElementById('emergency-clock');
+        const barEl = document.getElementById('emergency-bar');
+        
+        if (clockEl && barEl) {
+            clockEl.textContent = formatTime(timeLeft);
+            const percent = ((totalSeconds - timeLeft) / totalSeconds) * 100;
+            barEl.style.width = `${percent}%`;
+        }
+
+        if (timeLeft <= 0) {
+            clearInterval(emergencyInterval);
+            area.innerHTML = `
+                <div class="emergency-confirm-box">
+                    <span class="material-symbols-rounded" style="font-size: 60px; color: #4ade80;">check_circle</span>
+                    <div style="font-size: 1.3rem; color: var(--m3-on-surface); margin-top: 10px;">
+                        Coleta Finalizada!
+                    </div>
+                    <div style="font-size: 0.95rem; color: var(--m3-on-surface-variant); margin-top: 5px;">
+                        Os dados da OLT ${oltId} já devem estar atualizados na nuvem.<br>Atualize a página no menu para visualizar.
+                    </div>
+                    <button class="btn-cancel" style="margin-top: 25px; width: 100%;" onclick="closeEmergencyModal()">FECHAR JANELA</button>
+                </div>
+            `;
+        }
+    }, 1000);
+}
+
+// ==============================================================================
+// UTILITÁRIOS GLOBAIS RECUPERADOS E BLINDADOS (CORREÇÃO DE EXECUÇÃO FATAL)
 // ==============================================================================
 
 function checkIsHomePage() {
