@@ -2,261 +2,292 @@
    ESTILOS ESPECÍFICOS - DASHBOARD HOME (index.html)
    ========================================================================== */
 
-/* Padronização compacta dos cards na Home */
-.global-card .card-body {
-    padding: 16px 20px !important; 
-    box-sizing: border-box !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    flex-wrap: wrap !important;
+/* Cores de Destaque por Serviço */
+:root {
+    --color-rede: #4ade80;      /* Verde (Network) */
+    --color-energia: #f59e0b;   /* Laranja/Amarelo (Lightning) */
+    --color-potencia: #d946ef;  /* Roxo/Rosa (Insights) */
+    --color-temperatura: #ef4444; /* Vermelho (Thermometer) */
+    --color-equipamentos: #06b6d4; /* Ciano (Router) */
 }
 
-/* Ajuste das colunas internas para garantir centralização */
-.global-card div[style*="flex: 1"] {
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    align-items: center !important;
-    text-align: center !important;
-}
-
-/* Garante que a primeira coluna (Estatísticas) alinhe à esquerda */
-.global-card .card-stats {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    text-align: left !important;
-}
-
-/* --- RESTAURAÇÃO DE CORES DOS INDICADORES --- */
-.global-card .stat-item.online .stat-number, 
-.global-card .stat-item.online label, 
-.global-card .stat-item.online .icon-up { 
-    color: var(--m3-color-success) !important; 
-}
-.global-card .stat-item.offline .stat-number, 
-.global-card .stat-item.offline label, 
-.global-card .stat-item.offline .icon-down { 
-    color: var(--m3-color-error) !important; 
-}
-
-/* Layout em Grid Principal */
-.global-grid {
+/* Grid Exclusivo da Home para layout de 1 coluna (Etapa 1) */
+.home-wallboard-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 8px; 
+    gap: 15px; 
     width: 100%;
+    padding-bottom: 20px;
 }
 
-/* Layout dividido para Equipamentos e Potência / Rede e Potência */
-.split-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px; 
-    width: 100%;
+/* Garante que o card de equipamentos ocupe a linha inteira */
+#card-fabricantes {
+    grid-column: 1 / -1;
 }
 
+/* Cores aplicadas aos ícones dos cabeçalhos dos cards */
+#home-card-rede .card-header h3 span { color: var(--color-rede); }
+#home-card-energia .card-header h3 span { color: var(--color-energia); }
+#home-card-potencia .card-header h3 span { color: var(--color-potencia); }
+#home-card-temperatura .card-header h3 span { color: var(--color-temperatura); }
+#card-fabricantes .card-header h3 span { color: var(--color-equipamentos); }
+
+/* ==========================================================================
+   TIPOGRAFIA E ÍCONES (PADRONIZAÇÃO MD3)
+   ========================================================================== */
+.primary-value {
+    font-size: 2.5rem;
+    font-family: var(--font-family-mono);
+    font-weight: 700;
+    line-height: 1;
+}
+
+.primary-icon {
+    font-size: 28px !important;
+}
+
+.secondary-value {
+    font-size: 1.2rem;
+    font-family: var(--font-family-mono);
+    font-weight: 700;
+}
+
+.secondary-icon {
+    font-size: 20px !important;
+}
+
+/* ==========================================================================
+   CARDS GLOBAIS E ESTRUTURA WALLBOARD (WIDESCREEN MASONRY)
+   ========================================================================== */
 .global-card {
     background-color: var(--m3-surface-container);
     border-radius: 20px; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 0; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     display: flex;
     flex-direction: column;
-    margin: 0; 
+    overflow: hidden; 
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.global-card:hover { 
+    transform: translateY(-4px); 
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3); 
 }
 
 .global-card .card-header {
-    background-color: var(--m3-surface-container-high);
-    padding: 10px 20px; 
-    border-bottom: 1px solid var(--m3-outline-variant);
+    background-color: rgba(234, 208, 255, 0.03);
+    padding: 12px 20px; 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
 }
 
 .global-card .card-header h3 {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--m3-on-surface);
     display: flex;
     align-items: center;
     gap: 10px;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
-.global-stat {
+/* O CORAÇÃO DO NOVO LAYOUT: CSS GRID DENSE */
+.widescreen-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); 
+    grid-auto-flow: dense; 
+    gap: 12px;
+    padding: 15px 20px;
+}
+
+/* CARD MÉDIO (RESUMO GERAL) - Tamanho fixo e proporcional */
+.resumo-card {
+    grid-column: span 2; 
+    grid-row: span 2;    
+    background: rgba(103, 7, 159, 0.15);
+    border: 1px solid var(--m3-primary);
+    border-radius: 14px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
-    margin-bottom: 10px; 
+    justify-content: space-between;
+    box-shadow: 4px 4px 10px rgba(0,0,0,0.1);
 }
 
-.global-stat .stat-number {
-    font-size: 2.8rem;
+.resumo-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--m3-on-surface-variant);
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.resumo-main-val {
+    font-family: var(--font-family-mono);
+    font-size: 2.2rem;
     font-weight: 700;
     line-height: 1;
     margin-bottom: 5px;
-    font-family: var(--font-family-mono);
 }
 
-.global-stat label {
-    font-size: 0.9rem;
+.resumo-sec-val {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
     color: var(--m3-on-surface-variant);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 8px;
+    margin-top: 8px;
+}
+
+/* NOVO CONTÊINER DE GRÁFICO (Etapa 2 e 3) */
+.chart-container {
+    grid-column: 3 / -1; 
+    grid-row: span 2;
+    background: rgba(255,255,255,0.01);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 14px;
+    padding: 15px;
+    box-sizing: border-box;
+    min-height: 170px;
+    width: 100%;
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    position: relative;
 }
 
-.triple-progress-bar {
-    height: 14px; width: 100%; background: var(--m3-surface-container-high); 
-    border-radius: 4px; display: flex; overflow: hidden; margin-top: 12px; 
-}
-.bar-online { background-color: var(--m3-on-surface); } 
-.bar-poweroff { background-color: #f87171; } 
-.bar-offline { background-color: var(--m3-color-warning); }
-
-/* Classes utilitárias para quebra de linha (Comportamento Desktop Padrão) */
-.mobile-break-separator { display: inline; }
-.mobile-break-line { display: inline; }
-
-
-/* ==========================================================================
-   TOP 3 OLTs POTÊNCIA (HOME) 
-   ========================================================================== */
-.potencia-top-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    width: 100%;
+/* CONTAINER PARA OS MINIGRÁFICOS GAUGE (Etapa 4) */
+.gauge-wrapper {
+    position: relative;
+    width: 60px;
+    height: 30px;
+    margin: 2px 0;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
 }
 
-.potencia-top-card {
-    background-color: rgba(255,255,255,0.03);
+/* CONTAINER PARA OS HEATMAPS TÉRMICOS (Etapa 5) */
+.heatmap-wrapper {
+    position: relative;
+    width: 60px;
+    height: 30px; 
+    margin: 2px 0;
+    pointer-events: none;
+}
+
+/* FORÇAR CANVAS A RESPEITAR A JAULA */
+.gauge-wrapper canvas,
+.heatmap-wrapper canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* MINI-CARDS (AS OLTS) */
+.status-card {
+    background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px;
-    padding: 12px 5px;
+    border-radius: 14px;
+    padding: 8px 4px; 
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between; 
     text-align: center;
-    transition: transform 0.2s, background-color 0.2s;
-    cursor: pointer; /* Alterado para pointer indicando interatividade */
-}
-
-.potencia-top-card:hover {
-    transform: translateY(-2px);
-    background-color: rgba(255,255,255,0.05);
-}
-
-.potencia-top-card .pot-olt-name {
-    font-size: 0.95rem;
-    color: var(--m3-on-surface);
-    font-weight: 700;
-    margin-bottom: 8px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-}
-
-.potencia-top-card .pot-olt-media {
-    font-family: var(--font-family-mono);
-    font-size: 1.35rem; 
-    font-weight: 700;
-    line-height: 1;
-}
-
-/* ==========================================================================
-   GRID DE MINI-TERMÔMETROS (TEMPERATURA HOME)
-   ========================================================================== */
-.temp-badge-grid {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 8px;
-    width: 100%;
-    margin-top: 10px;
-}
-
-.temp-badge-item {
-    flex: 0 1 calc(11.11% - 8px); 
-    min-width: 110px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    border: 1px solid rgba(255,255,255,0.05);
+    gap: 1px;
+    transition: transform 0.2s, background 0.2s;
+    height: 100%;
+    min-height: 90px; 
     box-sizing: border-box;
-    transition: transform 0.2s ease, border-color 0.2s ease;
-    cursor: pointer; /* Indicando interatividade */
+    cursor: pointer;
 }
 
-.temp-badge-item:hover {
-    transform: translateY(-2px);
+.status-card:hover { 
+    transform: translateY(-2px); 
+    background: rgba(255,255,255,0.05); 
 }
 
-.temp-badge-item .olt-name {
-    color: var(--m3-on-surface);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.olt-name { 
+    font-size: 0.75rem; 
+    font-weight: 700; 
+    color: var(--m3-on-surface); 
 }
 
-.temp-badge-item .temp-value {
-    font-family: var(--font-family-mono);
-    font-size: 1.1rem;
+.olt-value { 
+    font-family: var(--font-family-mono); 
+    font-size: 1.1rem; 
+    line-height: 1; 
 }
 
-.temp-badge-item .material-symbols-rounded {
-    transition: transform 0.3s ease;
-}
-.temp-badge-item.status-critico .material-symbols-rounded {
-    animation: pulse-fire 1.2s infinite alternate;
-}
-@keyframes pulse-fire {
-    0% { transform: scale(1); opacity: 0.8; text-shadow: 0 0 2px rgba(248, 113, 113, 0.4); }
-    100% { transform: scale(1.2); opacity: 1; text-shadow: 0 0 8px rgba(248, 113, 113, 1); }
+.olt-label { 
+    font-size: 0.65rem; 
+    color: var(--m3-on-surface-variant); 
+    text-transform: uppercase;
 }
 
-.temp-badge-item.status-normal { background-color: rgba(255,255,255,0.03); }
-.temp-badge-item.status-normal .temp-value, .temp-badge-item.status-normal .material-symbols-rounded { color: #4ade80; }
+/* CORES DE STATUS DINÂMICAS PARA OS MINICARDS */
+.status-card.ok { 
+    background: rgba(103, 194, 58, 0.05); 
+    border-color: rgba(103, 194, 58, 0.15); 
+}
+.status-card.ok .olt-value, .status-card.ok .material-symbols-rounded { 
+    color: var(--m3-color-success); 
+}
 
-.temp-badge-item.status-atencao { background-color: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.3); }
-.temp-badge-item.status-atencao .temp-value, .temp-badge-item.status-atencao .material-symbols-rounded { color: #f97316; }
+.status-card.danger { 
+    background: rgba(245, 108, 108, 0.15); 
+    border-color: rgba(245, 108, 108, 0.4); 
+    box-shadow: 0 0 8px rgba(245, 108, 108, 0.2); 
+}
+.status-card.danger .olt-value, .status-card.danger .material-symbols-rounded { 
+    color: var(--m3-color-error); 
+}
 
-.temp-badge-item.status-critico { background-color: rgba(248, 113, 113, 0.15); border-color: rgba(248, 113, 113, 0.3); }
-.temp-badge-item.status-critico .temp-value, .temp-badge-item.status-critico .material-symbols-rounded { color: #f87171; }
-
+.status-card.warning { 
+    background: rgba(230, 162, 60, 0.15); 
+    border-color: rgba(230, 162, 60, 0.4); 
+}
+.status-card.warning .olt-value, .status-card.warning .material-symbols-rounded { 
+    color: var(--m3-color-warning); 
+}
 
 /* ==========================================================================
-   GRID DE FABRICANTES (EQUIPAMENTOS HOME)
+   ESTRUTURAS ORIGINAIS MANTIDAS (Equipamentos e Modais)
    ========================================================================== */
+.card-body {
+    padding: 20px; 
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; 
+    gap: 20px;
+    flex: 1;
+}
+
 .eqp-badge-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); 
     gap: 12px;
     width: 100%;
-    margin-top: 10px;
 }
 
 .eqp-badge-item {
     background-color: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.05);
     border-radius: 12px;
-    padding: 12px 8px;
+    padding: 15px 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -307,12 +338,9 @@
     opacity: 0.5;
 }
 
-
 /* ==========================================================================
    SISTEMA HÍBRIDO: TOOLTIP INTELIGENTE (PC) E MODAL RÁPIDO (MOBILE)
    ========================================================================== */
-
-/* Tooltip Dinâmico - Flutuante no Body */
 #smart-tooltip {
     position: absolute;
     background-color: var(--m3-surface-container-high);
@@ -362,12 +390,11 @@
     gap: 24px;
 }
 
-/* Modal Rápido - Focado em Mobile/Tablet */
 .fast-modal-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background-color: rgba(0, 0, 0, 0.6);
-    display: none; /* Ativado via JavaScript */
+    display: none; 
     align-items: center;
     justify-content: center;
     z-index: 99999;
@@ -380,6 +407,7 @@
     border-radius: 16px;
     padding: 20px;
     width: 280px;
+    max-width: 90%;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     position: relative;
     text-align: left;
@@ -399,57 +427,22 @@
     color: var(--m3-on-surface);
 }
 
-
-/* RESPONSIVIDADE EXCLUSIVA DA HOME (MÓVEL & TABLETS) */
-@media (max-width: 900px) {
-    .split-grid {
-        grid-template-columns: 1fr; 
-    }
-
-    .global-card .card-body {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        padding: 15px !important; 
-    }
-
-    .global-card .card-stats,
-    .global-card div[style*="flex: 1"] {
-        width: 100% !important; 
-        max-width: 100% !important;
-        border-left: none !important;
-        padding-left: 0 !important; 
-        padding-right: 0 !important;
-        padding-top: 15px !important; 
-        padding-bottom: 15px !important;
-        align-items: flex-start !important;
-        text-align: left !important;
-    }
-
-    .global-card div[style*="flex: 1"] {
-        border-top: none !important;
-    }
-
-    .donut-chart-container {
-        align-self: center !important;
-        margin-top: 15px !important;
-    }
-
-    .temp-badge-grid {
-        justify-content: flex-start; 
-    }
-    .temp-badge-item {
-        flex: 1 1 calc(33% - 8px); 
+/* ==========================================================================
+   AJUSTES RESPONSIVOS (Telas menores)
+   ========================================================================== */
+@media (max-width: 1024px) {
+    .home-wallboard-grid {
+        grid-template-columns: 1fr;
     }
     
-    .eqp-badge-grid {
-        grid-template-columns: repeat(3, 1fr); 
+    .chart-container {
+        grid-column: 1 / -1; 
+        grid-row: auto;
+        min-height: 190px;
     }
-
-    .mobile-break-separator {
-        display: none !important;
-    }
-    .mobile-break-line {
-        display: block !important;
-        margin-top: 3px;
+    
+    .resumo-card {
+        grid-column: 1 / -1;
+        grid-row: auto;
     }
 }

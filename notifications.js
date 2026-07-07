@@ -7,6 +7,14 @@ let currentProblems = new Set();
 let currentBackbones = new Set(); 
 let currentHybridProblems = new Set(); 
 
+// Helper para formatar o nome do circuito corretamente
+function formatarNomeCircuito(nome) {
+    if (!nome || nome === '-') return 'Circ. N/A';
+    const lower = nome.toLowerCase();
+    if (lower.startsWith('circ') || lower.startsWith('link')) return nome;
+    return `Circ. ${nome}`;
+}
+
 function showToast(title, description, typeClass, icon, position = 'right') {
     const path = window.location.pathname;
     const pageName = path.split('/').pop(); 
@@ -60,7 +68,19 @@ function checkAndNotifyForNewProblems(newProblems, activeBackbones = new Set(), 
     // 1. DETECTAR NORMALIZAÇÕES
     for (const oldBb of currentBackbones) {
         if (!activeBackbones.has(oldBb)) {
-            showToast('Backbone Normalizado', `${oldBb}`, 'status-normal', 'check_circle', 'right');
+            // Nova assinatura Backbone inclui a quantidade de clientes.
+            // Para não spammar normalização se apenas o número mudar, verificamos se a OLT ainda está no set.
+            const matchBb = oldBb.match(/^\[(.*?)\] BACKBONE::(\d+)$/);
+            if (matchBb) {
+                const oltId = matchBb[1];
+                const stillHas = Array.from(activeBackbones).some(b => b.startsWith(`[${oltId}] BACKBONE::`));
+                if (!stillHas) {
+                    showToast('Backbone Normalizado', `${oltId}`, 'status-normal', 'check_circle', 'right');
+                }
+            } else {
+                // Fallback de segurança
+                showToast('Backbone Normalizado', `${oldBb}`, 'status-normal', 'check_circle', 'right');
+            }
         }
     }
 
@@ -75,15 +95,30 @@ function checkAndNotifyForNewProblems(newProblems, activeBackbones = new Set(), 
                         showToast('Rede Normalizada', `${oltId} operando normalmente`, 'status-normal', 'check_circle', 'right');
                     }
                 }
-            } else {
-                const matchSingle = oldProblem.match(/^\[(.*?)\] STATUS::(.*?)_(\d+\/\d+)/);
-                if (matchSingle) {
-                    const oltId = matchSingle[1];
-                    const porta = matchSingle[3];
+            } else if (oldProblem.includes("STATUS::CIRCUITO::")) {
+                const matchCircuito = oldProblem.match(/^\[(.*?)\] STATUS::CIRCUITO::(.*?)::(\d+\/\d+)/);
+                if (matchCircuito) {
+                    const oltId = matchCircuito[1];
+                    const circuitoNome = matchCircuito[2];
+                    const porta = matchCircuito[3];
                     const stillHasIssue = Array.from(newProblems).some(p => p.startsWith(`[${oltId}] STATUS::`) && p.includes(porta));
                     
                     if (!stillHasIssue) {
-                        showToast('Sinal Normalizado', `${oltId} - ${porta}`, 'status-normal', 'check_circle', 'right'); 
+                        const circText = formatarNomeCircuito(circuitoNome);
+                        showToast('Circuito Normalizado', `${oltId} - ${porta} - ${circText}`, 'status-normal', 'check_circle', 'right'); 
+                    }
+                }
+            } else {
+                const matchSingle = oldProblem.match(/^\[(.*?)\] STATUS::(.*?)_(\d+\/\d+)::\d+::(.*)$/);
+                if (matchSingle) {
+                    const oltId = matchSingle[1];
+                    const porta = matchSingle[3];
+                    const circuitoNome = matchSingle[4];
+                    const stillHasIssue = Array.from(newProblems).some(p => p.startsWith(`[${oltId}] STATUS::`) && p.includes(porta));
+                    
+                    if (!stillHasIssue) {
+                        const circText = formatarNomeCircuito(circuitoNome);
+                        showToast('Sinal Normalizado', `${oltId} - ${porta} - ${circText}`, 'status-normal', 'check_circle', 'right'); 
                     }
                 }
             }
@@ -93,13 +128,23 @@ function checkAndNotifyForNewProblems(newProblems, activeBackbones = new Set(), 
     // 2. DISPAROS: BACKBONE NÍVEL 2 (Massivo)
     for (const bb of activeBackbones) {
         if (!currentBackbones.has(bb)) {
-            showToast(
-                'BACKBONE', 
-                `${bb}`, 
-                'backbone-l2', 
-                'sos', 
-                'right'
-            );
+            const matchBb = bb.match(/^\[(.*?)\] BACKBONE::(\d+)$/);
+            if (matchBb) {
+                const oltId = matchBb[1];
+                const offCount = matchBb[2];
+                // Evita disparar novamente se apenas o número de offline atualizou
+                const alreadyHas = Array.from(currentBackbones).some(b => b.startsWith(`[${oltId}] BACKBONE::`));
+                
+                if (!alreadyHas) {
+                    showToast(
+                        'BACKBONE', 
+                        `${oltId} - ${offCount} <span class="material-symbols-rounded" style="font-size: 22px; vertical-align: middle;">router_off</span>`, 
+                        'backbone-l2', 
+                        'sos', 
+                        'right'
+                    );
+                }
+            }
         }
     }
     currentBackbones = new Set(activeBackbones);
@@ -108,19 +153,43 @@ function checkAndNotifyForNewProblems(newProblems, activeBackbones = new Set(), 
     const activeHybridPorts = new Set(); 
 
     for (const hb of newHybridProblems) {
-        const match = hb.match(/^\[(.*?)\] HIBRIDO::(\d+\/\d+)::(\d+)::(\d+)$/);
+        // Nova assinatura: Alarme Múltiplo de Energia
+        const matchMultiplo = hb.match(/^\[(.*?)\] HIBRIDO_MULTIPLO::(.*?)::(\d+)::(\d+)$/);
+        if (matchMultiplo) {
+            const oltId = matchMultiplo[1];
+            const portasStr = matchMultiplo[2];
+            const offEnergia = matchMultiplo[4]; // Pegamos apenas o de energia como requisitado
+            
+            const portas = portasStr.split(',');
+            portas.forEach(p => activeHybridPorts.add(`${oltId}_${p}`));
+            
+            if (!currentHybridProblems.has(hb)) {
+                showToast(
+                    'Alarme Múltiplo de Energia', 
+                    `${oltId} - ${offEnergia} <span class="material-symbols-rounded" style="font-size: 22px; vertical-align: middle;">power_off</span>`, 
+                    'hibrido-multiplo', 
+                    'electric_bolt', 
+                    'left' 
+                );
+            }
+            continue;
+        }
+
+        // Assinatura clássica: Alarme Híbrido Individual
+        const match = hb.match(/^\[(.*?)\] HIBRIDO::(\d+\/\d+)::(\d+)::(\d+)::(.*)$/);
         if (match) {
             const oltId = match[1];
             const porta = match[2];
-            const offRede = match[3];
-            const offEnergia = match[4];
+            const offEnergia = match[4]; // Ignorando o offRede a pedido do novo padrão
+            const circuitoNome = match[5];
             
+            const circText = formatarNomeCircuito(circuitoNome);
             activeHybridPorts.add(`${oltId}_${porta}`);
             
             if (!currentHybridProblems.has(hb)) {
                 showToast(
                     'Queda de Energia', 
-                    `${oltId} (${porta}): ${offRede} <span class="material-symbols-rounded" style="font-size: 22px; vertical-align: middle;">router</span> / ${offEnergia} <span class="material-symbols-rounded" style="font-size: 22px; vertical-align: middle;">power_off</span>`, 
+                    `${oltId} - ${porta} - ${circText}: ${offEnergia} <span class="material-symbols-rounded" style="font-size: 22px; vertical-align: middle;">power_off</span>`, 
                     'hibrido', 
                     'offline_bolt', 
                     'left' 
@@ -134,21 +203,63 @@ function checkAndNotifyForNewProblems(newProblems, activeBackbones = new Set(), 
     for (const problemKey of newProblems) {
         if (!currentProblems.has(problemKey)) {
 
+            // Nova Assinatura: Alarme de Circuito
+            const matchCircuito = problemKey.match(/^\[(.*?)\] STATUS::CIRCUITO::(.*?)::(\d+\/\d+)::(\d+)$/);
+            if (matchCircuito) {
+                const oltId = matchCircuito[1];
+                const circuitoNome = matchCircuito[2];
+                const porta = matchCircuito[3];
+
+                if (activeHybridPorts.has(`${oltId}_${porta}`)) continue;
+
+                const circText = formatarNomeCircuito(circuitoNome);
+
+                showToast(
+                    'Alarme de Circuito', 
+                    `${oltId} - ${porta} - ${circText}`, 
+                    'backbone-l1', 
+                    'crisis_alert', 
+                    'right' 
+                );
+                continue;
+            }
+
+            // Verifica Assinatura Múltipla
             const matchMulti = problemKey.match(/^\[(.*?)\] STATUS::MULTI::(.*)$/);
             if (matchMulti) {
                 const oltId = matchMulti[1];
                 const multiString = matchMulti[2]; 
                 
-                let portsArray = multiString.split(',');
+                let portsDataArray = multiString.split(',');
+                let affectedList = [];
 
-                portsArray = portsArray.filter(p => !activeHybridPorts.has(`${oltId}_${p}`));
-                if (portsArray.length === 0) continue;
+                portsDataArray.forEach(data => {
+                    const parts = data.split('::');
+                    if (parts.length >= 2) {
+                        const porta = parts[0];
+                        const circuitoNome = parts[1];
 
-                const descLimpa = portsArray.join(', ');
+                        if (!activeHybridPorts.has(`${oltId}_${porta}`)) {
+                            const circText = formatarNomeCircuito(circuitoNome);
+                            affectedList.push(`${oltId} - ${porta} - ${circText}`);
+                        }
+                    } else {
+                        // Fallback de segurança para dados antigos
+                        const porta = data;
+                        if (!activeHybridPorts.has(`${oltId}_${porta}`)) {
+                            affectedList.push(`${oltId} - ${porta}`);
+                        }
+                    }
+                });
+
+                if (affectedList.length === 0) continue;
+
+                // Transforma a lista de problemas em linhas separadas
+                const descFormatada = affectedList.join('<br>');
 
                 showToast(
                     'Falha Múltipla', 
-                    `${oltId} - ${descLimpa}`, 
+                    descFormatada, 
                     'rede-problem', 
                     'error',        
                     'right' 
@@ -156,13 +267,17 @@ function checkAndNotifyForNewProblems(newProblems, activeBackbones = new Set(), 
                 continue; 
             }
 
-            const matchSingle = problemKey.match(/^\[(.*?)\] STATUS::(SUPER|CRIT|WARN)_(\d+\/\d+)::(\d+)$/);
+            // Verifica Assinatura Individual (Super, Crit, Warn)
+            const matchSingle = problemKey.match(/^\[(.*?)\] STATUS::(SUPER|CRIT|WARN)_(\d+\/\d+)::(\d+)::(.*)$/);
             if (matchSingle) {
                 const oltId = matchSingle[1];
                 const severity = matchSingle[2];
                 const porta = matchSingle[3];
+                const circuitoNome = matchSingle[5];
 
                 if (activeHybridPorts.has(`${oltId}_${porta}`)) continue;
+
+                const circText = formatarNomeCircuito(circuitoNome);
 
                 let title = 'Problema';
                 let typeClass = 'rede-problem';
@@ -180,7 +295,7 @@ function checkAndNotifyForNewProblems(newProblems, activeBackbones = new Set(), 
 
                 showToast(
                     title, 
-                    `${oltId} - ${porta}`, 
+                    `${oltId} - ${porta} - ${circText}`, 
                     typeClass, 
                     icon, 
                     'right' 

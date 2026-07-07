@@ -1,27 +1,17 @@
 // ==============================================================================
 // potencia-engine.js - Motor Dedicado para Análise de Potência Óptica
-// Atualização: Sistema Híbrido (Smart Tooltip / Fast Modal) Integrado
+// Atualização: Wallboard da Home - Substituição do Resumo Global por Gauges
 // ==============================================================================
-
-const TAB_CIRCUITOS_POTENCIA = 'CIRCUITO'; 
 
 window.POTENCIA_CLIENTS_DATA = {};
 window.POTENCIA_PORT_DATA = {}; 
-window.currentPotenciaInterval = null; 
 window.CURRENT_VIEW_PLACA = null; 
-
-function parsePowerValue(powerStr) {
-    if (!powerStr) return null;
-    const cleaned = powerStr.replace(/[^\d.-]/g, '');
-    const val = parseFloat(cleaned);
-    return isNaN(val) ? null : val;
-}
+window.CURRENT_POTENCIA_CONFIG = null;
 
 function isMobileDevice() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 900;
 }
 
-// Funções Injetadas Globalmente para o Hover/Clique
 window.handlePotHover = function(event) {
     if (isMobileDevice()) return;
     const tooltip = document.getElementById('smart-tooltip');
@@ -34,16 +24,16 @@ window.handlePotHover = function(event) {
             ${el.dataset.olt}
         </div>
         <div class="smart-tooltip-line">
-            <span style="color: var(--m3-on-surface-variant);">Média Global:</span> 
+            <span style="color: var(--m3-on-surface-variant);">Média de Potência:</span> 
             <strong style="font-family: var(--font-family-mono); color: ${el.dataset.color};">${el.dataset.media} dBm</strong>
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Saúde da Rede:</span> 
-            <strong style="color: ${el.dataset.health >= 90 ? '#4ade80' : '#f87171'};">${el.dataset.health}%</strong>
+            <strong style="color: ${el.dataset.health >= 90 ? 'var(--m3-color-success)' : 'var(--m3-color-error)'};">${el.dataset.health}%</strong>
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Clientes Críticos:</span> 
-            <strong style="color:#f87171">${el.dataset.crit}</strong>
+            <strong style="color: var(--m3-color-error);">${el.dataset.crit}</strong>
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Total Analisado:</span> 
@@ -81,7 +71,7 @@ window.handlePotClick = function(event) {
         <div style="margin-bottom: 15px; display: flex; justify-content: space-between;">
             <div>
                 <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem;">Clientes Críticos</span><br>
-                <strong style="font-size: 1.2rem; color: #f87171;">${el.dataset.crit}</strong>
+                <strong style="font-size: 1.2rem; color: var(--m3-color-error);">${el.dataset.crit}</strong>
             </div>
             <div style="text-align: right;">
                 <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem;">Total Analisado</span><br>
@@ -90,7 +80,7 @@ window.handlePotClick = function(event) {
         </div>
         <div style="text-align: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
             <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem;">Saúde Óptica da OLT</span><br>
-            <strong style="color: ${el.dataset.health >= 90 ? '#4ade80' : '#f87171'}; font-size: 1.2rem;">${el.dataset.health}%</strong>
+            <strong style="color: ${el.dataset.health >= 90 ? 'var(--m3-color-success)' : 'var(--m3-color-error)'}; font-size: 1.2rem;">${el.dataset.health}%</strong>
         </div>
     `;
     modal.style.display = 'flex';
@@ -150,12 +140,13 @@ window.exportPotenciaPlacaToTXT = function() {
     
     rows.forEach(row => {
         const cols = row.querySelectorAll('td');
-        if (cols.length >= 3) {
+        if (cols.length >= 4) {
             const porta = cols[0].innerText.trim();
             const circuito = cols[1].innerText.trim();
-            const media = cols[2].innerText.trim();
+            const bairro = cols[2].innerText.trim();
+            const media = cols[3].innerText.trim();
             
-            txtContent += `• ${porta.padEnd(10, ' ')} | Circuito: ${circuito.padEnd(25, ' ')} | Média: ${media}\n`;
+            txtContent += `• ${porta.padEnd(10, ' ')} | Circuito: ${circuito.padEnd(12, ' ')} | Bairro: ${bairro.padEnd(45, ' ')} | Média: ${media}\n`;
         }
     });
     
@@ -170,43 +161,37 @@ window.exportPotenciaPlacaToTXT = function() {
     document.body.removeChild(link);
 };
 
-async function runPotenciaEngine() {
-    const gridEl = document.getElementById('potencia-grid');
-    const globalBody = document.getElementById('global-potencia-body');
-    const timestampEl = document.getElementById('update-timestamp');
-    
-    const isPotenciaPage = window.location.pathname.includes('potencia.html');
-    
-    if (!globalBody && !gridEl) return; 
+function runPotenciaEngine() {
+    if (!window.DATA_STORE || !window.DATA_STORE.isReady) return;
 
-    if (timestampEl && timestampEl.textContent.includes('Aguardando')) {
-        timestampEl.innerHTML = '<span class="material-symbols-rounded">hourglass_empty</span> Buscando dados...';
-    }
+    const gridEl = document.getElementById('potencia-grid');
+    const isPotenciaPage = window.location.pathname.includes('potencia.html');
+    const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
+
+    if (!isPotenciaPage && !isHomePage) return;
 
     try {
         let globalCriticos = 0;
         let globalAnalisados = 0;
+        let globalDbmSums = 0;
+        let globalLatestUpdate = '--/--/---- --:--:--';
         let oltStats = [];
         let todosClientesCriticos = []; 
         
         window.POTENCIA_CLIENTS_DATA = {};
         window.POTENCIA_LAST_UPDATES = {};
 
-        const ranges = GLOBAL_MASTER_OLT_LIST.map(o => `${o.sheetTab}!A:K`);
-        const dataBatch = await API.getBatch(ranges);
-
-        if (!dataBatch.valueRanges) throw new Error("Falha na estrutura de retorno da API de Potência");
-
-        GLOBAL_MASTER_OLT_LIST.forEach((olt, index) => {
-            const rows = dataBatch.valueRanges[index].values ? dataBatch.valueRanges[index].values.slice(1) : [];
+        GLOBAL_MASTER_OLT_LIST.forEach((olt) => {
+            const values = window.DATA_STORE.olts[olt.id] || [];
+            const rows = values.slice(1);
             
             let analisados = 0;
             let criticos = 0;
             let dbmSums = 0;
             let lastUpdateStr = '--/--/---- --:--:--'; 
 
-            if (dataBatch.valueRanges[index].values && dataBatch.valueRanges[index].values.length > 0) {
-                const firstRow = dataBatch.valueRanges[index].values[0];
+            if (values.length > 0) {
+                const firstRow = values[0];
                 let cellData = firstRow[10] ? String(firstRow[10]) : '';
                 if (!cellData) {
                     for (let i = firstRow.length - 1; i >= 0; i--) {
@@ -219,7 +204,10 @@ async function runPotenciaEngine() {
                 if (cellData) {
                     const dateMatch = cellData.match(/\d{2}\/\d{2}\/\d{2,4}/);
                     const timeMatch = cellData.match(/\d{2}:\d{2}(:\d{2})?/);
-                    if (dateMatch && timeMatch) lastUpdateStr = `${dateMatch[0]} ${timeMatch[0]}`;
+                    if (dateMatch && timeMatch) {
+                        lastUpdateStr = `${dateMatch[0]} ${timeMatch[0]}`;
+                        globalLatestUpdate = lastUpdateStr;
+                    }
                 }
             }
 
@@ -228,38 +216,28 @@ async function runPotenciaEngine() {
             rows.forEach(columns => {
                 if (columns.length === 0) return;
 
-                let isOnline = false, pwrStr = '', porta = '', serial = '', codigo = '';
+                const isOnline = DataMapper.isOnline(columns[olt.type === 'nokia' ? 4 : 2], olt.type);
+                if (!isOnline) return;
 
-                if (olt.type === 'nokia') {
-                    isOnline = (columns[4] || '').trim().toLowerCase().includes('up');
-                    if (!isOnline) return;
-                    pwrStr = columns[5]; 
-                    porta = columns[0] || '';
-                    serial = columns[2] || ''; 
-                    codigo = columns[8] || ''; 
-                } else {
-                    isOnline = (columns[2] || '').trim().toLowerCase() === 'active';
-                    if (!isOnline) return;
-                    pwrStr = columns[5]; 
-                    porta = columns[0] || '';
-                    serial = columns[3] || ''; 
-                    codigo = columns[7] || ''; 
-                }
+                const portInfo = DataMapper.extractPort(columns[0], olt.type);
+                if (!portInfo) return;
 
-                const powerVal = parsePowerValue(pwrStr);
+                const powerVal = DataMapper.parsePowerValue(columns[5]);
                 
-                if (powerVal !== null && powerVal !== 0 && powerVal < 0 && powerVal >= -60.00) {
+                if (DataMapper.isValidPower(powerVal)) {
                     analisados++;
                     dbmSums += powerVal;
                     
                     if (powerVal <= -28.00) { 
                         criticos++; 
-                        todosClientesCriticos.push({ olt: olt.id, porta, serial, codigo, potencia: powerVal });
+                        let serial = olt.type === 'nokia' ? columns[2] : columns[3];
+                        let codigo = olt.type === 'nokia' ? columns[8] : columns[7];
+                        todosClientesCriticos.push({ olt: olt.id, porta: `${portInfo.placa}/${portInfo.porta}`, serial: serial || '', codigo: codigo || '', potencia: powerVal });
                     } 
                 }
             });
 
-            const media = analisados > 0 ? (dbmSums / analisados).toFixed(2) : 0;
+            const media = analisados > 0 ? (dbmSums / analisados).toFixed(1) : 0;
             const health = analisados > 0 ? (((analisados - criticos) / analisados) * 100) : 0;
 
             oltStats.push({
@@ -273,62 +251,158 @@ async function runPotenciaEngine() {
 
             globalCriticos += criticos;
             globalAnalisados += analisados;
+            globalDbmSums += dbmSums;
         });
 
-        if (globalBody) {
-            const validOlts = oltStats.filter(o => o.analisados > 0);
-            validOlts.sort((a, b) => parseFloat(a.media) - parseFloat(b.media));
-            const top3Olts = validOlts.slice(0, 3);
-
-            let rankingHtml = '';
+        // ==============================================================================
+        // INJEÇÃO DA HOME (Wallboard Widescreen com Mini Gauges em cada card)
+        // ==============================================================================
+        if (isHomePage) {
+            const globalMedia = globalAnalisados > 0 ? (globalDbmSums / globalAnalisados).toFixed(1) : "0.0";
             
-            if (top3Olts.length > 0) {
-                rankingHtml += `<div class="potencia-top-grid">`;
-                
-                top3Olts.forEach(o => {
-                    const mediaVal = parseFloat(o.media);
-                    let color = '#f87171'; 
-                    if (mediaVal > -26.00) color = '#fbbf24'; 
+            // Suporte legado
+            const elAnalisado = document.getElementById('potencia-total-analisado');
+            const elCriticos = document.getElementById('potencia-total-criticos');
+            const elMedia = document.getElementById('potencia-global-media');
+            const elIcon = document.getElementById('potencia-main-icon');
+            const elDate = document.getElementById('potencia-date');
+            const elTime = document.getElementById('potencia-time');
 
-                    rankingHtml += `
-                        <div class="potencia-top-card"
-                             data-olt="${o.id}"
-                             data-media="${o.media}"
-                             data-health="${o.health.toFixed(1)}"
-                             data-crit="${o.criticos}"
-                             data-total="${o.analisados}"
-                             data-color="${color}"
+            if (elAnalisado) elAnalisado.textContent = globalAnalisados;
+            if (elCriticos) elCriticos.textContent = globalCriticos;
+            
+            let globalMediaColor = 'var(--m3-color-success)'; 
+            let gMediaVal = parseFloat(globalMedia);
+            if (gMediaVal <= -28.00) globalMediaColor = 'var(--m3-color-error)'; 
+            else if (gMediaVal <= -26.00) globalMediaColor = 'var(--m3-color-warning)';
+
+            if (elMedia) {
+                elMedia.textContent = globalMedia;
+                elMedia.style.color = globalMediaColor;
+                if (elIcon) elIcon.style.color = globalMediaColor;
+            }
+
+            if (globalLatestUpdate !== '--/--/---- --:--:--') {
+                const dateParts = globalLatestUpdate.split(' ');
+                if (elDate) elDate.textContent = dateParts[0] || '--/--/----';
+                if (elTime) elTime.textContent = dateParts[1] || '--:--:--';
+            }
+
+            const targetWidescreen = document.getElementById('target-potencia-widescreen');
+            
+            if (targetWidescreen) {
+                // Inicia HTML Vazio (Removido o .resumo-card)
+                let htmlWidescreen = ``;
+                
+                // Filtra OLTs que tem dados analisados
+                const validOlts = oltStats.filter(o => o.analisados > 0);
+                
+                // Ordenar da pior média para a melhor
+                validOlts.sort((a, b) => parseFloat(a.media) - parseFloat(b.media));
+
+                // Montar os minicards fluidos com os contêineres do gauge
+                validOlts.forEach(stat => {
+                    let statusClass = 'ok';
+                    let mediaColor = 'var(--m3-color-success)';
+                    let mediaVal = parseFloat(stat.media);
+                    
+                    if (mediaVal <= -28.00) {
+                        statusClass = 'danger';
+                        mediaColor = 'var(--m3-color-error)';
+                    } else if (mediaVal <= -26.00) {
+                        statusClass = 'warning';
+                        mediaColor = 'var(--m3-color-warning)';
+                    }
+
+                    htmlWidescreen += `
+                        <div class="status-card ${statusClass}"
+                             data-olt="${stat.id}"
+                             data-media="${stat.media}"
+                             data-health="${stat.health.toFixed(1)}"
+                             data-crit="${stat.criticos}"
+                             data-total="${stat.analisados}"
+                             data-color="${mediaColor}"
                              onmouseenter="handlePotHover(event)"
                              onmouseleave="handlePotLeave()"
                              onclick="handlePotClick(event)">
-                            <span class="pot-olt-name" style="pointer-events: none;">
-                                <span class="material-symbols-rounded" style="font-size: 16px; color: var(--m3-on-surface-variant);">dns</span>
-                                ${o.id}
-                            </span>
-                            <span class="pot-olt-media" style="color: ${color}; pointer-events: none;">${o.media}</span>
-                            <span style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin-top: 4px; pointer-events: none;">dBm</span>
+                            
+                            <div style="display: flex; align-items: center; gap: 4px; pointer-events: none;">
+                                <span class="material-symbols-rounded" style="font-size: 14px; color: var(--m3-on-surface-variant);">dns</span>
+                                <span class="olt-name">${stat.id}</span>
+                            </div>
+
+                            <div class="gauge-wrapper">
+                                <canvas id="gauge-pot-${stat.id}"></canvas>
+                            </div>
+
+                            <div style="pointer-events: none; line-height: 1.1;">
+                                <span class="olt-value" style="color: ${mediaColor};">${stat.media}</span>
+                                <span class="olt-label">dBm</span>
+                            </div>
+
                         </div>
                     `;
                 });
                 
-                rankingHtml += `</div>`;
-            } else {
-                rankingHtml = `<div style="text-align: center; color: var(--m3-color-success); font-weight: 700; margin-top: 15px; width: 100%;"><span class="material-symbols-rounded" style="font-size: 48px;">sentiment_very_satisfied</span><br>Rede sem clientes online lidos!</div>`;
-            }
+                targetWidescreen.innerHTML = htmlWidescreen;
 
-            globalBody.innerHTML = `
-                <div style="width: 100%; display: flex; flex-direction: column; justify-content: stretch; height: 100%;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
-                        <span class="material-symbols-rounded" style="color: #f87171; font-size: 20px;">insights</span>
-                        <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Piores Médias (OLTs)</h3>
-                    </div>
-                    <div style="flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-                        ${rankingHtml}
-                    </div>
-                </div>
-            `;
+                // Inicializar os minigráficos Gauge para cada OLT
+                if (typeof Chart !== 'undefined') {
+                    if (!window.potenciaGauges) window.potenciaGauges = {};
+                    
+                    validOlts.forEach(stat => {
+                        const canvasId = `gauge-pot-${stat.id}`;
+                        const canvasEl = document.getElementById(canvasId);
+                        if (!canvasEl) return;
+                        
+                        const ctx = canvasEl.getContext('2d');
+                        
+                        if (window.potenciaGauges[stat.id]) {
+                            window.potenciaGauges[stat.id].destroy();
+                        }
+
+                        let mediaVal = parseFloat(stat.media);
+                        let chartColor = 'rgba(103, 194, 58, 1)'; 
+                        if (mediaVal <= -28.00) chartColor = 'rgba(245, 108, 108, 1)';
+                        else if (mediaVal <= -26.00) chartColor = 'rgba(230, 162, 60, 1)';
+                        
+                        // Normalização simples do Gauge (-35 péssimo (0%), -15 excelente (100%))
+                        let perc = ((mediaVal - (-35)) / (-15 - (-35))) * 100;
+                        if (perc < 0) perc = 0;
+                        if (perc > 100) perc = 100;
+
+                        window.potenciaGauges[stat.id] = new Chart(ctx, {
+                            type: 'doughnut',
+                            data: {
+                                datasets: [{
+                                    data: [perc, 100 - perc],
+                                    backgroundColor: [chartColor, 'rgba(255, 255, 255, 0.08)'],
+                                    borderWidth: 0
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                circumference: 180, // Faz o formato de velocímetro (meia lua)
+                                rotation: 270,      // Inicia da esquerda para direita
+                                cutout: '75%',      // Espessura da linha
+                                plugins: {
+                                    tooltip: { enabled: false },
+                                    legend: { display: false }
+                                },
+                                animation: {
+                                    duration: 0 // Impede que pisque a cada refresh silencioso
+                                }
+                            }
+                        });
+                    });
+                }
+            }
         }
 
+        // ==============================================================================
+        // INJEÇÃO DA PÁGINA POTENCIA.HTML (Cards individuais mantidos)
+        // ==============================================================================
         if (isPotenciaPage && gridEl) {
             gridEl.innerHTML = '';
             
@@ -350,6 +424,14 @@ async function runPotenciaEngine() {
                 const dateVal = dateParts[0] || '--/--/----';
                 const timeVal = dateParts[1] || '--:--:--';
                 
+                let mediaVal = parseFloat(o.media);
+                let mediaColor = 'var(--m3-color-success)';
+                if (mediaVal <= -28.00) {
+                    mediaColor = 'var(--m3-color-error)';
+                } else if (mediaVal <= -26.00) {
+                    mediaColor = 'var(--m3-color-warning)';
+                }
+
                 gridEl.innerHTML += `
                     <div class="overview-card" id="card-${o.id}" style="display: flex; flex-direction: column; width: 100%;">
                         <div class="card-header" style="justify-content: space-between; width: 100%; box-sizing: border-box;">
@@ -358,23 +440,22 @@ async function runPotenciaEngine() {
                         </div>
                         <div class="card-body" style="flex-direction: column; padding: 16px 20px; width: 100%; box-sizing: border-box;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; width: 100%;">
-                                <div style="display: flex; flex-direction: column; gap: 8px;">
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span class="material-symbols-rounded" style="color:var(--m3-on-surface); font-size: 18px;">search</span>
-                                        <span style="font-size: 1.1rem; color:var(--m3-on-surface); font-weight: 500;">${o.analisados}</span>
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;" title="Total Analisado">
+                                        <span class="material-symbols-rounded" style="color:var(--m3-on-surface); font-size: 20px;">search</span>
+                                        <span style="font-size: 1.2rem; color:var(--m3-on-surface); font-weight: bold; font-family: var(--font-family-mono);">${o.analisados}</span>
                                     </div>
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span class="material-symbols-rounded" style="color:#fbbf24; font-size: 18px;">warning</span>
-                                        <span style="font-size: 1.1rem; color:#fbbf24; font-weight: bold;">${o.criticos}</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span class="material-symbols-rounded" style="color:#60a5fa; font-size: 18px;">insights</span>
-                                        <span style="font-size: 1.1rem; color:var(--m3-on-surface); font-weight: 500;">${o.media} dBm</span>
+                                    <div style="display: flex; align-items: center; gap: 8px;" title="Clientes Críticos">
+                                        <span class="material-symbols-rounded" style="color:var(--m3-color-error); font-size: 20px;">warning</span>
+                                        <span style="font-size: 1.2rem; color:var(--m3-color-error); font-weight: bold; font-family: var(--font-family-mono);">${o.criticos}</span>
                                     </div>
                                 </div>
-                                <div style="text-align: right;">
-                                    <span style="font-size: 2rem; font-family: var(--font-family-mono); font-weight: bold; color: ${o.health >= 90 ? 'var(--m3-color-success)' : 'var(--m3-color-error)'};">${o.health.toFixed(1)}%</span><br>
-                                    <span style="font-size: 0.75rem; color: var(--m3-on-surface-variant); text-transform: uppercase;">Saúde</span>
+                                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end;" title="Média de Potência">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="material-symbols-rounded" style="color:${mediaColor}; font-size: 28px;">insights</span>
+                                        <span style="font-size: 2.2rem; font-family: var(--font-family-mono); font-weight: bold; color: ${mediaColor}; line-height: 1;">${o.media}</span>
+                                    </div>
+                                    <span style="font-size: 0.8rem; color: var(--m3-on-surface-variant); text-transform: uppercase; margin-top: 6px;">Média (dBm)</span>
                                 </div>
                             </div>
                             <div style="border-top: 1px solid var(--m3-outline); padding-top: 12px; display: flex; justify-content: center; align-items: center; gap: 15px; width: 100%;">
@@ -396,25 +477,6 @@ async function runPotenciaEngine() {
     }
 }
 
-// ==============================================================================
-// SISTEMA DE NAVEGAÇÃO DE MODAIS (PLACA -> PORTA -> CLIENTES)
-// ==============================================================================
-
-async function fetchCircuitosData() {
-    const range = `${TAB_CIRCUITOS_POTENCIA}!A:AK`;
-    try {
-        const data = await API.get(range);
-        return data.values || [];
-    } catch (e) { return []; }
-}
-
-window.stopPotenciaMonitoring = function() {
-    if (window.currentPotenciaInterval) {
-        clearInterval(window.currentPotenciaInterval);
-        window.currentPotenciaInterval = null;
-    }
-};
-
 window.openPotenciaSuperModal = function(id, sheetTab, type, boards) {
     try {
         const modal = document.getElementById('super-modal');
@@ -424,25 +486,16 @@ window.openPotenciaSuperModal = function(id, sheetTab, type, boards) {
         document.getElementById('potencia-view-detalhes').style.display = 'none';
         document.getElementById('potencia-view-placas').style.display = 'block';
         
-        document.getElementById('potencia-placas-list').innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 40px;">
-                <span class="material-symbols-rounded" style="font-size: 48px; display: block; margin-bottom: 10px;">hourglass_top</span>
-                <h2>Lendo potências da OLT...</h2>
-            </div>
-        `;
-        
         modal.style.display = 'flex';
         
-        if (typeof window.startPotenciaMonitoring === 'function') {
-            window.startPotenciaMonitoring({ id: sheetTab, type: type, boards: boards, oltName: id });
-        }
+        window.startPotenciaMonitoring({ id: sheetTab, type: type, boards: boards, oltName: id });
     } catch (e) {
         console.error("Erro ao abrir o modal das OLTs:", e);
     }
 }
 
 window.startPotenciaMonitoring = function(config) {
-    window.stopPotenciaMonitoring(); 
+    window.CURRENT_POTENCIA_CONFIG = config;
 
     if (!document.getElementById('detail-modal')) {
         const modalHTML = `
@@ -461,8 +514,8 @@ window.startPotenciaMonitoring = function(config) {
                                     <option value="critico">Crítico (<= -28 dBm)</option>
                                 </select>
                             </div>
-                            <div class="client-table-container">
-                                <table id="table-clients">
+                            <div class="table-container">
+                                <table id="table-clients" class="noc-table">
                                     <thead id="clients-thead" class="table-header-row"></thead>
                                     <tbody id="clients-tbody"></tbody>
                                 </table>
@@ -475,69 +528,58 @@ window.startPotenciaMonitoring = function(config) {
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     }
 
-    async function populateTables() {
+    function populateTables() {
+        if (!window.DATA_STORE || !window.DATA_STORE.isReady) return;
+
         window.POTENCIA_PORT_DATA = {}; 
         window.POTENCIA_CLIENTS_DATA = {}; 
-        const rangeOlt = `${config.id}!A:K`; 
 
         try {
-            const [dataOlt, rowsCircuitos] = await Promise.all([API.get(rangeOlt), fetchCircuitosData()]);
-            const rowsOlt = (dataOlt.values || []).slice(1);
+            const rowsCircuitos = window.DATA_STORE.circuitos || [];
+            const rowsLocalidades = window.DATA_STORE.localidades || [];
+            const dataOlt = window.DATA_STORE.olts[config.oltName || config.id] || [];
+            
+            const rowsOlt = dataOlt.slice(1);
 
             rowsOlt.forEach(columns => {
                 if (columns.length === 0) return;
-                let placa, porta, isOnline;
-                let pos = '', serial = '', potencia = '', desc1 = '', desc2 = '';
 
-                if (config.type === 'nokia') {
-                    const pon = columns[0];
-                    const status = columns[4]; 
-                    if (!pon || !status) return;
-                    const match = pon.match(/(\d+)\/(\d+)\/(\d+)\/(\d+)/);
-                    if (match) { placa = match[3]; porta = match[4]; }
-                    isOnline = status.trim().toLowerCase().includes('up');
+                const isOnline = DataMapper.isOnline(columns[config.type === 'nokia' ? 4 : 2], config.type);
+                if (!isOnline) return;
 
-                    pos = columns[1] || '';
-                    serial = columns[2] || '';
-                    potencia = columns[5] || ''; 
-                    desc1 = columns[7] || ''; 
-                    desc2 = columns[8] || ''; 
-                } else { 
-                    const portStr = columns[0];
-                    const status = columns[2]; 
-                    if (!portStr || !status) return;
-                    
-                    if (config.type === 'furukawa-10') {
-                        const parts = portStr.split('/');
-                        if (parts.length >= 2) { placa = parts[0]; porta = parts[1]; }
-                    } else {
-                        const match = portStr.match(/GPON\s*(\d+)\/(\d+)/i);
-                        if (match) { placa = match[1]; porta = match[2]; }
-                    }
-                    isOnline = status.trim().toLowerCase() === 'active';
+                const portInfo = DataMapper.extractPort(columns[0], config.type);
+                if (!portInfo) return;
 
-                    pos = columns[1] || '';
-                    potencia = columns[5] || ''; 
-                    serial = columns[3] || ''; 
-                    desc1 = columns[7] || ''; 
-                }
+                const powerVal = DataMapper.parsePowerValue(columns[5]);
+                if (!DataMapper.isValidPower(powerVal)) return;
 
-                if (!placa || !porta || !isOnline) return;
-                
-                const powerVal = parsePowerValue(potencia);
-                if (powerVal === null || powerVal >= 0 || powerVal < -60.00) return; 
-
+                const { placa, porta } = portInfo;
                 const placaNum = parseInt(placa);
                 const portaNum = parseInt(porta);
                 const portKey = `${placaNum}/${portaNum}`;
+                
+                let pos = '', serial = '', desc1 = '', desc2 = '';
+
+                if (config.type === 'nokia') {
+                    pos = columns[1] || '';
+                    serial = columns[2] || '';
+                    desc1 = columns[7] || ''; 
+                    desc2 = columns[8] || ''; 
+                } else { 
+                    pos = columns[1] || '';
+                    serial = columns[3] || ''; 
+                    desc1 = columns[7] || ''; 
+                }
                 
                 if (!window.POTENCIA_PORT_DATA[placaNum]) {
                     window.POTENCIA_PORT_DATA[placaNum] = {};
                 }
 
                 if (!window.POTENCIA_PORT_DATA[placaNum][portaNum]) {
-                    const infoExtra = getGlobalCircuitInfo(rowsCircuitos, config.oltName || config.id, placa, porta, config.type);
-                    window.POTENCIA_PORT_DATA[placaNum][portaNum] = { validCount: 0, sumPower: 0, info: infoExtra };
+                    const infoExtra = DataMapper.getCircuitInfo(rowsCircuitos, config, placa, porta);
+                    const bairroExtra = DataMapper.getBairroInfo(rowsLocalidades, config.oltName || config.id, placa, porta, config.type);
+                    
+                    window.POTENCIA_PORT_DATA[placaNum][portaNum] = { validCount: 0, sumPower: 0, info: infoExtra, bairro: bairroExtra };
                     window.POTENCIA_CLIENTS_DATA[portKey] = [];
                 }
 
@@ -589,9 +631,8 @@ window.startPotenciaMonitoring = function(config) {
         }
     }
 
-    const runUpdate = async () => { await populateTables(); };
-    runUpdate(); 
-    window.currentPotenciaInterval = setInterval(runUpdate, GLOBAL_REFRESH_SECONDS * 1000); 
+    window.updatePotenciaModal = populateTables;
+    populateTables();
 }
 
 window.openPotenciaPlacaDetails = function(placa, oltType) {
@@ -607,19 +648,20 @@ window.openPotenciaPlacaDetails = function(placa, oltType) {
     const sortedPorts = Object.keys(ports).sort((a, b) => parseInt(a) - parseInt(b));
     
     if (sortedPorts.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding: 20px; color: var(--m3-on-surface-variant);">Nenhuma porta com leituras de potência nesta placa.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px; color: var(--m3-on-surface-variant);">Nenhuma porta com leituras de potência nesta placa.</td></tr>`;
         return;
     }
 
     sortedPorts.forEach(pt => {
-        const { validCount, sumPower, info } = ports[pt];
-        const media = validCount > 0 ? (sumPower / validCount).toFixed(2) : 0;
+        const { validCount, sumPower, info, bairro } = ports[pt];
+        const media = validCount > 0 ? (sumPower / validCount).toFixed(1) : 0;
         
-        let mediaColor = 'var(--m3-on-surface)';
-        if (media <= -28.00) mediaColor = '#f87171'; 
-        else if (media <= -26.00) mediaColor = '#fbbf24'; 
+        let statusClass = 'status-normal';
+        if (media <= -28.00) statusClass = 'status-critico'; 
+        else if (media <= -26.00) statusClass = 'status-atencao'; 
 
         const safeInfo = info.replace(/'/g, "\\'");
+        const textoBairro = bairro && bairro !== '-' ? bairro : 'N/A';
 
         tbody.innerHTML += `
             <tr>
@@ -631,8 +673,11 @@ window.openPotenciaPlacaDetails = function(placa, oltType) {
                         ${info}
                     </span>
                 </td>
+                <td style="font-family: var(--font-family-mono); font-size: 0.9rem; color: var(--m3-on-surface-variant);">${textoBairro}</td>
                 <td>
-                    <strong style="color: ${mediaColor};">${media} dBm</strong>
+                    <button class="status ${statusClass} status-btn" style="cursor: default;">
+                        ${media} dBm
+                    </button>
                 </td>
             </tr>
         `;
@@ -674,7 +719,7 @@ window.openPotenciaCircuitClients = function(placa, porta, circuitoNome, oltType
         clients.forEach(c => {
             const isCritical = c.potencia <= -28.00;
             const rowClass = isCritical ? 'client-row filter-critico bg-alerta-sinal' : 'client-row filter-normal';
-            const valColor = isCritical ? '#f87171' : 'inherit';
+            const valColor = isCritical ? 'var(--m3-color-error)' : 'inherit';
             
             let rowHTML = '';
             if (oltType === 'nokia') {
@@ -707,7 +752,7 @@ window.filterClients = function() {
 window.closeSuperModal = function(event) {
     if (event && event.target.id !== 'super-modal' && !event.target.classList.contains('close-modal')) return;
     document.getElementById('super-modal').style.display = 'none';
-    if (typeof window.stopPotenciaMonitoring === 'function') window.stopPotenciaMonitoring();
+    window.CURRENT_POTENCIA_CONFIG = null;
 }
 
 window.backToPotenciaPlacas = function() {
@@ -725,13 +770,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const isPotenciaPage = window.location.pathname.includes('potencia.html');
     
     if (isPotenciaPage) {
-        if (typeof loadHeader === 'function') loadHeader({ title: "Análise de Potência", exactTitle: true });
+        if (typeof loadHeader === 'function') loadHeader({ title: "Monitoramento de Potência", exactTitle: true });
         if (typeof loadFooter === 'function') loadFooter();
         setTimeout(updateGlobalTimestamp, 500);
     }
-    
-    if (isPotenciaPage || checkIsHomePage()) {
-        setTimeout(runPotenciaEngine, 1000);
-        setInterval(runPotenciaEngine, GLOBAL_REFRESH_SECONDS * 1000);
+});
+
+window.addEventListener('dadosAtualizados', () => {
+    runPotenciaEngine();
+
+    if (window.CURRENT_POTENCIA_CONFIG && typeof window.updatePotenciaModal === 'function') {
+        window.updatePotenciaModal();
+        
+        if (document.getElementById('potencia-view-detalhes') && document.getElementById('potencia-view-detalhes').style.display === 'block' && window.CURRENT_VIEW_PLACA) {
+            window.openPotenciaPlacaDetails(window.CURRENT_VIEW_PLACA, window.CURRENT_POTENCIA_CONFIG.type);
+        }
     }
 });

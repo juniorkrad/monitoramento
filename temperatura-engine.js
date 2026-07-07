@@ -1,6 +1,6 @@
 // ==============================================================================
 // temperatura-engine.js - Motor Dedicado para Análise Térmica das OLTs
-// Atualização: Sistema Híbrido (Smart Tooltip / Fast Modal) Integrado
+// Atualização: Wallboard da Home - Substituição do Resumo Global por Heatmaps
 // ==============================================================================
 
 const TAB_TEMPERATURA = 'TEMPERATURA'; 
@@ -13,12 +13,12 @@ const MAPA_COLUNAS_TEMP = {
 
 window.TEMP_DATA_STORE = {}; 
 window.CURRENT_VIEW_SLOT = null; 
+window.CURRENT_TEMP_OLT = null; 
 
 function isMobileDevice() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 900;
 }
 
-// Funções Injetadas Globalmente para o Hover/Clique
 window.handleTempHover = function(event) {
     if (isMobileDevice()) return;
     const tooltip = document.getElementById('smart-tooltip');
@@ -36,7 +36,7 @@ window.handleTempHover = function(event) {
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Sensores em Alerta:</span> 
-            <strong><span style="color:#f87171">${el.dataset.crit}</span> / <span style="color:#f97316">${el.dataset.warn}</span></strong>
+            <strong><span style="color: var(--m3-color-error);">${el.dataset.crit}</span> / <span style="color: var(--m3-color-warning);">${el.dataset.warn}</span></strong>
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Status Geral:</span> 
@@ -73,11 +73,11 @@ window.handleTempClick = function(event) {
         <div style="margin-bottom: 15px; display: flex; justify-content: space-between;">
             <div>
                 <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem;">Sensores Críticos</span><br>
-                <strong style="font-size: 1.2rem; color: #f87171;">${el.dataset.crit}</strong>
+                <strong style="font-size: 1.2rem; color: var(--m3-color-error);">${el.dataset.crit}</strong>
             </div>
             <div style="text-align: right;">
                 <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem;">Sensores em Atenção</span><br>
-                <strong style="font-size: 1.2rem; color: #f97316;">${el.dataset.warn}</strong>
+                <strong style="font-size: 1.2rem; color: var(--m3-color-warning);">${el.dataset.warn}</strong>
             </div>
         </div>
         <div style="text-align: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
@@ -163,32 +163,33 @@ window.exportTemperaturaSlotToTXT = function() {
     document.body.removeChild(link);
 };
 
-async function runTemperaturaEngine() {
-    const gridEl = document.getElementById('temperatura-grid');
-    const globalBody = document.getElementById('global-temperatura-body');
-    const timestampEl = document.getElementById('update-timestamp');
-    
-    const isTemperaturaPage = window.location.pathname.includes('temperatura.html');
-    
-    if (!globalBody && !gridEl) return; 
+function runTemperaturaEngine() {
+    if (!window.DATA_STORE || !window.DATA_STORE.isReady) return;
 
-    if (timestampEl && timestampEl.textContent.includes('Aguardando')) {
-        timestampEl.innerHTML = '<span class="material-symbols-rounded">hourglass_empty</span> Buscando dados...';
-    }
+    const gridEl = document.getElementById('temperatura-grid');
+    const isTemperaturaPage = window.location.pathname.includes('temperatura.html');
+    const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
+
+    if (!isTemperaturaPage && !isHomePage) return;
 
     try {
         let oltStats = [];
         window.TEMP_DATA_STORE = {};
 
-        const range = `${TAB_TEMPERATURA}!A:CX`;
-        const dataBatch = await API.get(range);
+        let globalAnalisados = 0;
+        let globalCriticos = 0;
+        let globalAtencao = 0;
+        let globalMaxTemp = 0;
+        let globalLastUpdate = '--/--/---- --:--:--';
+
+        const values = window.DATA_STORE.temperatura || [];
         
-        if (!dataBatch.values || dataBatch.values.length < 2) {
-            console.warn("Aba de Temperatura sem dados estruturados.");
+        if (values.length < 2) {
+            console.warn("Aba de Temperatura sem dados estruturados na memória.");
             return;
         }
 
-        const rows = dataBatch.values.slice(2); 
+        const rows = values.slice(2); 
 
         GLOBAL_MASTER_OLT_LIST.forEach(oltDef => {
             const oltId = oltDef.id;
@@ -212,10 +213,14 @@ async function runTemperaturaEngine() {
 
                 if (!slot || isNaN(tempAtual)) return;
                 
-                if (dataHora) lastUpdateStr = dataHora;
+                if (dataHora) {
+                    lastUpdateStr = dataHora;
+                    globalLastUpdate = dataHora;
+                }
                 analisados++;
                 
                 if (tempAtual > maxTemp) maxTemp = tempAtual;
+                if (tempAtual > globalMaxTemp) globalMaxTemp = tempAtual;
 
                 let isCritico = tempAtual >= 90 || (!isNaN(limCrit) && tempAtual >= limCrit);
                 let isAtencao = (!isCritico) && (tempAtual >= 80 || (!isNaN(limAlta) && tempAtual >= limAlta));
@@ -246,78 +251,178 @@ async function runTemperaturaEngine() {
                 health,
                 lastUpdate: lastUpdateStr
             });
+
+            globalAnalisados += analisados;
+            globalCriticos += criticos;
+            globalAtencao += atencao;
         });
 
-        if (globalBody) {
-            let badgesHtml = '';
-            
-            GLOBAL_MASTER_OLT_LIST.forEach(oltDef => {
-                const o = oltStats.find(stats => stats.id === oltDef.id);
+        // ==============================================================================
+        // INJEÇÃO DA HOME (Mini Cards Wallboard com Heatmap Sparkline)
+        // ==============================================================================
+        if (isHomePage) {
+            // Suporte Legado
+            const elAnalisado = document.getElementById('temperatura-total-analisado');
+            const elCriticos = document.getElementById('temperatura-total-criticos');
+            const elAtencao = document.getElementById('temperatura-total-atencao');
+            const elMaxima = document.getElementById('temperatura-global-maxima');
+            const elIcon = document.getElementById('temperatura-main-icon');
+            const elDate = document.getElementById('temperatura-date');
+            const elTime = document.getElementById('temperatura-time');
+
+            if (elAnalisado) elAnalisado.textContent = globalAnalisados;
+            if (elCriticos) elCriticos.textContent = globalCriticos;
+            if (elAtencao) elAtencao.textContent = globalAtencao;
+
+            let globalTempColor = 'var(--m3-color-success)'; 
+            if (globalMaxTemp >= 90) globalTempColor = 'var(--m3-color-error)'; 
+            else if (globalMaxTemp >= 80) globalTempColor = 'var(--m3-color-warning)';
+
+            if (elMaxima) {
+                elMaxima.textContent = globalMaxTemp + '°C';
+                elMaxima.style.color = globalTempColor;
+                if (elIcon) elIcon.style.color = globalTempColor;
+            }
+
+            if (globalLastUpdate !== '--/--/---- --:--:--') {
+                const dateParts = globalLastUpdate.split(' ');
+                if (elDate) elDate.textContent = dateParts[0] || '--/--/----';
+                if (elTime) elTime.textContent = dateParts[1] || '--:--:--';
+            }
+
+            const targetWidescreen = document.getElementById('target-temperatura-widescreen');
+            if (targetWidescreen) {
                 
-                if (!o || o.analisados === 0) {
-                    badgesHtml += `
-                        <div class="temp-badge-item" style="background-color: rgba(255,255,255,0.02); opacity: 0.5;">
-                            <div style="display: flex; align-items: center; gap: 6px; pointer-events: none;">
-                                <span class="material-symbols-rounded" style="font-size: 18px; color: var(--m3-on-surface-variant);">device_thermostat</span>
-                                <span class="olt-name">${oltDef.id}</span>
+                // Inicia HTML Vazio (Removido o .resumo-card)
+                let htmlWidescreen = ``;
+                
+                const validOlts = oltStats.filter(o => o.analisados > 0);
+                
+                // Ordena da OLT mais quente para a mais fria
+                validOlts.sort((a, b) => b.maxTemp - a.maxTemp);
+
+                validOlts.forEach(stat => {
+                    let statusClass = 'ok';
+                    let tempColor = 'var(--m3-color-success)';
+                    let statusText = 'NORMAL';
+                    
+                    if (stat.maxTemp >= 90) {
+                        statusClass = 'danger';
+                        tempColor = 'var(--m3-color-error)';
+                        statusText = 'CRÍTICO';
+                    } else if (stat.maxTemp >= 80) {
+                        statusClass = 'warning';
+                        tempColor = 'var(--m3-color-warning)';
+                        statusText = 'ATENÇÃO';
+                    }
+
+                    htmlWidescreen += `
+                        <div class="status-card ${statusClass}"
+                             data-olt="${stat.id}"
+                             data-max="${stat.maxTemp}"
+                             data-crit="${stat.criticos}"
+                             data-warn="${stat.atencao}"
+                             data-status="${statusText}"
+                             data-icon="device_thermostat"
+                             data-color="${tempColor}"
+                             onmouseenter="handleTempHover(event)"
+                             onmouseleave="handleTempLeave()"
+                             onclick="handleTempClick(event)">
+                            
+                            <div style="display: flex; align-items: center; gap: 4px; pointer-events: none;">
+                                <span class="material-symbols-rounded" style="font-size: 14px; color: var(--m3-on-surface-variant);">dns</span>
+                                <span class="olt-name">${stat.id}</span>
                             </div>
-                            <span class="temp-value" style="pointer-events: none;">--</span>
+
+                            <div class="heatmap-wrapper">
+                                <canvas id="heatmap-temp-${stat.id}"></canvas>
+                            </div>
+
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px; pointer-events: none; line-height: 1.1;">
+                                <span class="material-symbols-rounded" style="font-size: 14px; color: ${tempColor};">thermometer</span>
+                                <span class="olt-value" style="color: ${tempColor};">${stat.maxTemp}°</span>
+                            </div>
+
                         </div>
                     `;
-                    return;
+                });
+                
+                targetWidescreen.innerHTML = htmlWidescreen;
+
+                // Inicializar os minigráficos Heatmap para cada OLT
+                if (typeof Chart !== 'undefined') {
+                    if (!window.tempHeatmaps) window.tempHeatmaps = {};
+                    
+                    validOlts.forEach(stat => {
+                        const canvasId = `heatmap-temp-${stat.id}`;
+                        const canvasEl = document.getElementById(canvasId);
+                        if (!canvasEl) return;
+                        
+                        const ctx = canvasEl.getContext('2d');
+                        
+                        if (window.tempHeatmaps[stat.id]) {
+                            window.tempHeatmaps[stat.id].destroy();
+                        }
+
+                        // Extrair as temperaturas de todos os sensores desta OLT
+                        let sensorTemps = [];
+                        let slotsObj = window.TEMP_DATA_STORE[stat.id] || {};
+                        Object.keys(slotsObj).forEach(slot => {
+                            slotsObj[slot].forEach(s => {
+                                sensorTemps.push(s.tempAtual);
+                            });
+                        });
+
+                        // Mapeamento dinâmico de cores para simular o mapa de calor
+                        let bgColors = sensorTemps.map(temp => {
+                            if (temp >= 90) return 'rgba(245, 108, 108, 1)'; // Vermelho
+                            if (temp >= 80) return 'rgba(230, 162, 60, 1)';  // Amarelo
+                            return 'rgba(103, 194, 58, 0.7)';                // Verde
+                        });
+
+                        window.tempHeatmaps[stat.id] = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: sensorTemps.map((_, i) => i), // Rótulos invisíveis
+                                datasets: [{
+                                    data: sensorTemps,
+                                    backgroundColor: bgColors,
+                                    barPercentage: 1.0,
+                                    categoryPercentage: 0.9,
+                                    borderRadius: 2
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: { enabled: false }
+                                },
+                                scales: {
+                                    x: { display: false },
+                                    y: { 
+                                        display: false,
+                                        min: 20, // Ajusta o limite inferior para melhorar o visual das barras
+                                        max: 100 // Ajusta o limite superior
+                                    } 
+                                },
+                                animation: {
+                                    duration: 0 // Impede oscilações nos updates
+                                },
+                                layout: {
+                                    padding: 0
+                                }
+                            }
+                        });
+                    });
                 }
-
-                let classeCSS = 'status-normal';
-                let icone = 'device_thermostat';
-                let statusText = 'Estável';
-                let colorStatus = '#4ade80';
-
-                if (o.criticos > 0 || o.maxTemp >= 90) {
-                    classeCSS = 'status-critico';
-                    icone = 'local_fire_department'; 
-                    statusText = 'Crítico';
-                    colorStatus = '#f87171';
-                } else if (o.atencao > 0 || o.maxTemp >= 80) {
-                    classeCSS = 'status-atencao';
-                    icone = 'device_thermostat';
-                    statusText = 'Atenção';
-                    colorStatus = '#f97316';
-                }
-
-                badgesHtml += `
-                    <div class="temp-badge-item ${classeCSS}"
-                         data-olt="${o.id}"
-                         data-max="${o.maxTemp}"
-                         data-crit="${o.criticos}"
-                         data-warn="${o.atencao}"
-                         data-status="${statusText}"
-                         data-color="${colorStatus}"
-                         data-icon="${icone}"
-                         onmouseenter="handleTempHover(event)"
-                         onmouseleave="handleTempLeave()"
-                         onclick="handleTempClick(event)">
-                        <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; pointer-events: none;">
-                            <span class="material-symbols-rounded" style="font-size: 18px;">${icone}</span>
-                            <span class="olt-name">${o.id}</span>
-                        </div>
-                        <span class="temp-value" style="pointer-events: none;">${o.maxTemp}°C</span>
-                    </div>
-                `;
-            });
-
-            globalBody.innerHTML = `
-                <div style="width: 100%; display: flex; flex-direction: column; justify-content: stretch; height: 100%;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                        <span class="material-symbols-rounded" style="color: #f97316; font-size: 20px;">grid_view</span>
-                        <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Pico Térmico Global</h3>
-                    </div>
-                    <div class="temp-badge-grid">
-                        ${badgesHtml}
-                    </div>
-                </div>
-            `;
+            }
         }
 
+        // ==============================================================================
+        // INJEÇÃO DA PÁGINA TEMPERATURA.HTML (Cards individuais mantidos)
+        // ==============================================================================
         if (isTemperaturaPage && gridEl) {
             gridEl.innerHTML = '';
             
@@ -339,6 +444,10 @@ async function runTemperaturaEngine() {
                 const dateVal = dateParts[0] || '--/--/----';
                 const timeVal = dateParts[1] || '--:--:--';
                 
+                let textColor = 'var(--m3-color-success)';
+                if (o.maxTemp >= 90) textColor = 'var(--m3-color-error)';
+                else if (o.maxTemp >= 80) textColor = 'var(--m3-color-warning)';
+
                 gridEl.innerHTML += `
                     <div class="overview-card" id="card-${o.id}" style="display: flex; flex-direction: column; width: 100%;">
                         <div class="card-header" style="justify-content: space-between; width: 100%; box-sizing: border-box;">
@@ -347,25 +456,24 @@ async function runTemperaturaEngine() {
                         </div>
                         <div class="card-body" style="flex-direction: column; padding: 16px 20px; width: 100%; box-sizing: border-box;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; width: 100%;">
-                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
                                     <div style="display: flex; align-items: center; gap: 8px;" title="Sensores Lidos">
-                                        <span class="material-symbols-rounded" style="color:var(--m3-on-surface); font-size: 18px;">memory</span>
-                                        <span style="font-size: 1.1rem; color:var(--m3-on-surface); font-weight: 500;">${o.analisados}</span>
+                                        <span class="material-symbols-rounded" style="color:var(--m3-on-surface); font-size: 20px;">memory</span>
+                                        <span style="font-size: 1.2rem; color:var(--m3-on-surface); font-weight: bold; font-family: var(--font-family-mono);">${o.analisados}</span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 8px;" title="Crítico / Atenção">
-                                        <span class="material-symbols-rounded" style="color:#f87171; font-size: 18px;">warning</span>
-                                        <span style="font-size: 1.1rem; color:var(--m3-on-surface); font-weight: bold;">
-                                            <span style="color:#f87171">${o.criticos}</span> / <span style="color:#f97316">${o.atencao}</span>
+                                        <span class="material-symbols-rounded" style="color:var(--m3-color-error); font-size: 20px;">warning</span>
+                                        <span style="font-size: 1.2rem; color:var(--m3-on-surface); font-weight: bold; font-family: var(--font-family-mono);">
+                                            <span style="color:var(--m3-color-error);">${o.criticos}</span> <span style="color:var(--m3-on-surface-variant); font-weight:normal;">/</span> <span style="color:var(--m3-color-warning);">${o.atencao}</span>
                                         </span>
                                     </div>
-                                    <div style="display: flex; align-items: center; gap: 8px;" title="Pico de Temperatura">
-                                        <span class="material-symbols-rounded" style="color:#f97316; font-size: 18px;">local_fire_department</span>
-                                        <span style="font-size: 1.1rem; color:var(--m3-on-surface); font-weight: 500;">${o.maxTemp} °C</span>
-                                    </div>
                                 </div>
-                                <div style="text-align: right;">
-                                    <span style="font-size: 2rem; font-family: var(--font-family-mono); font-weight: bold; color: ${o.health >= 90 ? 'var(--m3-color-success)' : 'var(--m3-color-error)'};">${o.health.toFixed(1)}%</span><br>
-                                    <span style="font-size: 0.75rem; color: var(--m3-on-surface-variant); text-transform: uppercase;">Saúde Térmica</span>
+                                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end;" title="Temperatura Máxima">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="material-symbols-rounded" style="color:${textColor}; font-size: 28px;">device_thermostat</span>
+                                        <span style="font-size: 2.2rem; font-family: var(--font-family-mono); font-weight: bold; color: ${textColor}; line-height: 1;">${o.maxTemp}°C</span>
+                                    </div>
+                                    <span style="font-size: 0.8rem; color: var(--m3-on-surface-variant); text-transform: uppercase; margin-top: 6px;">Temp. Máxima</span>
                                 </div>
                             </div>
                             <div style="border-top: 1px solid var(--m3-outline); padding-top: 12px; display: flex; justify-content: center; align-items: center; gap: 15px; width: 100%;">
@@ -390,6 +498,8 @@ async function runTemperaturaEngine() {
 window.openTemperaturaSuperModal = function(oltId) {
     const modal = document.getElementById('super-modal');
     if (!modal) return;
+    
+    window.CURRENT_TEMP_OLT = oltId;
     
     document.getElementById('super-modal-title').innerHTML = `<span class="material-symbols-rounded">device_thermostat</span> ${oltId}`;
     document.getElementById('temperatura-view-detalhes').style.display = 'none';
@@ -423,7 +533,7 @@ window.openTemperaturaSuperModal = function(oltId) {
             badgeHtml = `<span class="alarm-count critico">CRÍTICO</span>`;
         } else if (hasAtencao) {
             btnClass += ' has-warning';
-            badgeHtml = `<span class="alarm-count atencao" style="background:#f97316; color:#000;">ATENÇÃO</span>`;
+            badgeHtml = `<span class="alarm-count atencao" style="background:var(--m3-color-warning); color:#000;">ATENÇÃO</span>`;
         }
 
         placasList.innerHTML += `
@@ -461,11 +571,11 @@ window.openTemperaturaSlotDetails = function(oltId, slot) {
         
         if (s.isCritico) {
             statusBadge = `<span class="temp-critico">Crítico</span>`;
-            tempColor = '#f87171';
+            tempColor = 'var(--m3-color-error)';
             rowClass = 'bg-alerta-temp-critico';
         } else if (s.isAtencao) {
-            statusBadge = `<span class="temp-atencao" style="background: rgba(249, 115, 22, 0.15); color: #f97316 !important;">Atenção</span>`;
-            tempColor = '#f97316';
+            statusBadge = `<span class="temp-atencao" style="background: rgba(249, 115, 22, 0.15); color: var(--m3-color-warning) !important;">Atenção</span>`;
+            tempColor = 'var(--m3-color-warning)';
             rowClass = 'bg-alerta-temp-atencao';
         }
 
@@ -486,6 +596,8 @@ window.openTemperaturaSlotDetails = function(oltId, slot) {
 window.closeSuperModal = function(event) {
     if (event && event.target.id !== 'super-modal' && !event.target.classList.contains('close-modal')) return;
     document.getElementById('super-modal').style.display = 'none';
+    window.CURRENT_TEMP_OLT = null;
+    window.CURRENT_VIEW_SLOT = null;
 }
 
 window.backToTemperaturaSlots = function() {
@@ -501,9 +613,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof loadFooter === 'function') loadFooter();
         setTimeout(updateGlobalTimestamp, 500);
     }
-    
-    if (isTemperaturaPage || checkIsHomePage()) {
-        setTimeout(runTemperaturaEngine, 1000);
-        setInterval(runTemperaturaEngine, GLOBAL_REFRESH_SECONDS * 1000);
+});
+
+window.addEventListener('dadosAtualizados', () => {
+    runTemperaturaEngine();
+
+    const modal = document.getElementById('super-modal');
+    if (modal && modal.style.display === 'flex' && window.CURRENT_TEMP_OLT) {
+        window.openTemperaturaSuperModal(window.CURRENT_TEMP_OLT);
+        
+        if (document.getElementById('temperatura-view-detalhes') && document.getElementById('temperatura-view-detalhes').style.display === 'block' && window.CURRENT_VIEW_SLOT) {
+            window.openTemperaturaSlotDetails(window.CURRENT_TEMP_OLT, window.CURRENT_VIEW_SLOT);
+        }
     }
 });

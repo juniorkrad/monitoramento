@@ -1,6 +1,6 @@
 // ==============================================================================
 // equipamentos-engine.js - Motor de Fabricantes (Visão por Marca)
-// Atualização: Sistema Híbrido (Smart Tooltip / Fast Modal) Integrado
+// Atualização: Inclusão do fabricante ZTE
 // ==============================================================================
 
 const EQP_MARCAS = [
@@ -14,7 +14,8 @@ const EQP_MARCAS = [
     { nome: 'MAXPRINT / V-SOL', prefixos: 'GPON, VSOL, DE30' },
     { nome: 'PARKS', prefixos: 'PRKS' },
     { nome: 'TENDA', prefixos: 'TDTC' },
-    { nome: 'SHORELINE', prefixos: 'SHLN' }
+    { nome: 'SHORELINE', prefixos: 'SHLN' },
+    { nome: 'ZTE', prefixos: 'ZTEG' }
 ];
 
 const prefixToMarca = {};
@@ -71,11 +72,11 @@ window.handleEqpHover = function(event) {
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Online:</span> 
-            <strong style="color: #4ade80;">${el.dataset.online}</strong>
+            <strong style="color: var(--m3-color-success);">${el.dataset.online}</strong>
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Offline:</span> 
-            <strong style="color: #f87171;">${el.dataset.offline}</strong>
+            <strong style="color: var(--m3-color-error);">${el.dataset.offline}</strong>
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Saúde:</span> 
@@ -121,22 +122,30 @@ window.handleEqpClick = function(event) {
         </div>
         <div style="display: flex; gap: 10px;">
             <div style="flex:1; background:rgba(74,222,128,0.1); padding:8px; border-radius:8px; text-align:center;">
-                <span style="display:block; font-size:0.7rem; color:#4ade80;">ONLINE</span>
-                <strong style="font-family:var(--font-family-mono); color:#4ade80;">${el.dataset.online}</strong>
+                <span style="display:block; font-size:0.7rem; color:var(--m3-color-success);">ONLINE</span>
+                <strong style="font-family:var(--font-family-mono); color:var(--m3-color-success);">${el.dataset.online}</strong>
             </div>
             <div style="flex:1; background:rgba(248,113,113,0.1); padding:8px; border-radius:8px; text-align:center;">
-                <span style="display:block; font-size:0.7rem; color:#f87171;">OFFLINE</span>
-                <strong style="font-family:var(--font-family-mono); color:#f87171;">${el.dataset.offline}</strong>
+                <span style="display:block; font-size:0.7rem; color:var(--m3-color-error);">OFFLINE</span>
+                <strong style="font-family:var(--font-family-mono); color:var(--m3-color-error);">${el.dataset.offline}</strong>
             </div>
         </div>
     `;
     modal.style.display = 'flex';
 };
 
-async function runEquipamentosEngine() {
-    const globalBody = document.getElementById('global-equipamentos-body');
+function runEquipamentosEngine() {
+    if (!window.DATA_STORE || !window.DATA_STORE.isReady) return;
+
+    const globalBody = document.getElementById('card-fabricantes');
     const gridEqpPage = document.getElementById('equipamentos-grid');
+    
     const isEqpPage = window.location.pathname.includes('equipamentos.html');
+    const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
+
+    if (!isHomePage && globalBody) {
+        globalBody.style.display = 'none';
+    }
 
     if (!globalBody && !isEqpPage) return;
 
@@ -150,13 +159,9 @@ async function runEquipamentosEngine() {
             brandData[m] = { total: 0, online: 0, offline: 0, olts: {} };
         });
 
-        const ranges = GLOBAL_MASTER_OLT_LIST.map(o => `${o.sheetTab}!A:K`);
-        const dataBatch = await API.getBatch(ranges);
-
-        if (!dataBatch.valueRanges) return;
-
-        GLOBAL_MASTER_OLT_LIST.forEach((olt, index) => {
-            const rows = dataBatch.valueRanges[index].values ? dataBatch.valueRanges[index].values.slice(1) : [];
+        GLOBAL_MASTER_OLT_LIST.forEach((olt) => {
+            const values = window.DATA_STORE.olts[olt.id] || [];
+            const rows = values.slice(1);
 
             rows.forEach(columns => {
                 if (columns.length === 0) return;
@@ -190,39 +195,54 @@ async function runEquipamentosEngine() {
             });
         });
 
-        if (globalBody) {
-            let eqpHtml = `<div class="eqp-badge-grid">`;
-            todasMarcas.map(nome => ({ nome, ...brandData[nome] }))
-                .sort((a, b) => b.total - a.total)
-                .forEach(marca => {
-                    const color = marca.nome === 'DESCONHECIDOS' ? '#f87171' : '#60a5fa';
-                    const disabledClass = marca.total === 0 ? 'disabled' : '';
-                    const pctOnline = marca.total > 0 ? ((marca.online / marca.total) * 100).toFixed(1) : 0;
-                    
-                    const marcaInfo = EQP_MARCAS.find(em => em.nome === marca.nome);
-                    const prefixosTxt = marcaInfo ? marcaInfo.prefixos : 'Não Mapeado';
+        // ==============================================================================
+        // INJEÇÃO DA HOME (Abastecimento de dados no esqueleto fixo Widescreen)
+        // ==============================================================================
+        if (globalBody && isHomePage) {
+            globalBody.style.display = 'flex';
+            
+            const loadingEl = document.getElementById('global-eqp-loading');
+            const contentEl = document.getElementById('global-eqp-content');
+            const container = document.getElementById('eqp-badge-container');
+            
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (contentEl) contentEl.style.display = 'flex';
+            
+            if (container) {
+                container.innerHTML = ''; 
+                todasMarcas.map(nome => ({ nome, ...brandData[nome] }))
+                    .sort((a, b) => b.total - a.total)
+                    .forEach(marca => {
+                        const color = marca.nome === 'DESCONHECIDOS' ? 'var(--m3-color-error)' : 'var(--m3-on-surface)';
+                        const disabledClass = marca.total === 0 ? 'disabled' : '';
+                        const pctOnline = marca.total > 0 ? ((marca.online / marca.total) * 100).toFixed(1) : 0;
+                        
+                        const marcaInfo = EQP_MARCAS.find(em => em.nome === marca.nome);
+                        const prefixosTxt = marcaInfo ? marcaInfo.prefixos : 'Não Mapeado';
 
-                    eqpHtml += `
-                        <div class="eqp-badge-item ${disabledClass}"
-                             data-nome="${marca.nome}"
-                             data-prefixos="${prefixosTxt}"
-                             data-total="${marca.total}"
-                             data-online="${marca.online}"
-                             data-offline="${marca.offline}"
-                             data-pct="${pctOnline}"
-                             data-color="${color}"
-                             onmouseenter="handleEqpHover(event)"
-                             onmouseleave="handleEqpLeave()"
-                             onclick="handleEqpClick(event)">
-                            ${getLogoHtml(marca.nome)}
-                            <span class="eqp-total-value" style="margin-top: 2px; pointer-events: none;">${marca.total}</span>
-                        </div>
-                    `;
-                });
-            eqpHtml += `</div>`;
-            globalBody.innerHTML = `<div style="width:100%"><div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span class="material-symbols-rounded" style="color:#60a5fa;font-size:20px">inventory_2</span><h3 style="margin:0;font-size:1rem;color:var(--m3-on-surface)">Fabricantes na Rede</h3></div>${eqpHtml}</div>`;
+                        container.innerHTML += `
+                            <div class="eqp-badge-item ${disabledClass}"
+                                 data-nome="${marca.nome}"
+                                 data-prefixos="${prefixosTxt}"
+                                 data-total="${marca.total}"
+                                 data-online="${marca.online}"
+                                 data-offline="${marca.offline}"
+                                 data-pct="${pctOnline}"
+                                 data-color="${color}"
+                                 onmouseenter="handleEqpHover(event)"
+                                 onmouseleave="handleEqpLeave()"
+                                 onclick="handleEqpClick(event)">
+                                ${getLogoHtml(marca.nome)}
+                                <span class="eqp-total-value" style="margin-top: 2px; pointer-events: none; color: ${color};">${marca.total}</span>
+                            </div>
+                        `;
+                    });
+            }
         }
 
+        // ==============================================================================
+        // INJEÇÃO DA PÁGINA EQUIPAMENTOS.HTML (Cards individuais mantidos)
+        // ==============================================================================
         if (isEqpPage && gridEqpPage) {
             gridEqpPage.innerHTML = '';
 
@@ -266,11 +286,11 @@ async function runEquipamentosEngine() {
                             <div class="card-body" style="flex-direction:column; padding:20px; gap:15px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                                     <div style="display:flex; flex-direction:column; gap:4px;">
-                                        <span style="font-size:0.75rem; color:var(--m3-on-surface-variant); text-transform:uppercase;">Total Geral</span>
-                                        <span style="font-size:1.8rem; font-weight:700; color:#60a5fa; font-family:var(--font-family-mono); line-height:1;">${m.total}</span>
+                                        <span style="font-size:0.75rem; color:var(--m3-on-surface-variant); text-transform:uppercase;">Total</span>
+                                        <span style="font-size:1.5rem; font-weight:700; color:var(--m3-on-surface); font-family:var(--font-family-mono); line-height:1;">${m.total}</span>
                                     </div>
                                     <div style="text-align:right;">
-                                        <span style="font-size:1.5rem; font-weight:700; color:${health >= 95 ? 'var(--m3-color-success)' : '#fbbf24'}; font-family:var(--font-family-mono);">${health}%</span><br>
+                                        <span style="font-size:1.5rem; font-weight:700; color:${health >= 95 ? 'var(--m3-color-success)' : 'var(--m3-color-warning)'}; font-family:var(--font-family-mono);">${health}%</span><br>
                                         <span style="font-size:0.7rem; color:var(--m3-on-surface-variant); text-transform:uppercase;">Saúde</span>
                                     </div>
                                 </div>
@@ -282,12 +302,12 @@ async function runEquipamentosEngine() {
 
                                 <div style="display:flex; gap:10px; width:100%;">
                                     <div style="flex:1; background:rgba(74,222,128,0.1); padding:8px; border-radius:8px; text-align:center;">
-                                        <span style="display:block; font-size:0.7rem; color:#4ade80;">ONLINE</span>
-                                        <strong style="font-family:var(--font-family-mono); color:#4ade80;">${m.online}</strong>
+                                        <span style="display:block; font-size:0.7rem; color:var(--m3-color-success);">ONLINE</span>
+                                        <strong style="font-family:var(--font-family-mono); color:var(--m3-color-success);">${m.online}</strong>
                                     </div>
                                     <div style="flex:1; background:rgba(248,113,113,0.1); padding:8px; border-radius:8px; text-align:center;">
-                                        <span style="display:block; font-size:0.7rem; color:#f87171;">OFFLINE</span>
-                                        <strong style="font-family:var(--font-family-mono); color:#f87171;">${m.offline}</strong>
+                                        <span style="display:block; font-size:0.7rem; color:var(--m3-color-error);">OFFLINE</span>
+                                        <strong style="font-family:var(--font-family-mono); color:var(--m3-color-error);">${m.offline}</strong>
                                     </div>
                                 </div>
 
@@ -360,17 +380,14 @@ window.closeDistribuicaoModal = function(event) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const isEqpPage = window.location.pathname.includes('equipamentos.html');
-    const isHomePage = window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html');
     
     if (isEqpPage) {
-        if (typeof loadHeader === 'function') loadHeader({ title: "Equipamentos por Fabricante", exactTitle: true });
+        if (typeof loadHeader === 'function') loadHeader({ title: "Monitoramento de Equipamentos", exactTitle: true });
         if (typeof loadFooter === 'function') loadFooter();
-        
         setTimeout(updateGlobalTimestamp, 500); 
     }
+});
 
-    if (isEqpPage || isHomePage) {
-        setTimeout(runEquipamentosEngine, 1000);
-        setInterval(runEquipamentosEngine, GLOBAL_REFRESH_SECONDS * 1000);
-    }
+window.addEventListener('dadosAtualizados', () => {
+    runEquipamentosEngine();
 });

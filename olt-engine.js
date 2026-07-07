@@ -1,17 +1,14 @@
 // ==============================================================================
 // olt-engine.js - Motor Dedicado de Monitoramento de Rede (Individual e Global)
-// Atualização: Sistema Híbrido (Tooltip/Modal) no Top 3 OLTs Críticas (Home)
+// Atualização: Injeção de Dados (Serial, Código, Potência) e Limpeza de dBm
 // ==============================================================================
-
-const TAB_CIRCUITOS = 'CIRCUITO'; 
-const TAB_LOCALIDADE = 'LOCALIDADE'; 
 
 window.OLT_CLIENTS_DATA = {};
 window.CURRENT_OLT_PORT_DATA = {}; 
 window.NETWORK_PROBLEMS_STORE = new Set();
 window.NETWORK_BACKBONE_STORE = new Set();
-window.currentOltInterval = null; 
 window.CURRENT_VIEW_PLACA = null; 
+window.CURRENT_MONITORING_CONFIG = null;
 
 // ==============================================================================
 // FUNÇÕES DO SISTEMA HÍBRIDO (TOOLTIP PC / MODAL MOBILE)
@@ -26,18 +23,29 @@ window.handleNetHover = function(event) {
     if (!tooltip) return;
 
     const el = event.currentTarget;
+    let statusTexto = 'Normal';
+    let statusCor = 'var(--m3-color-success)';
+    
+    if (el.classList.contains('danger')) {
+        statusTexto = 'Crítico';
+        statusCor = 'var(--m3-color-error)';
+    } else if (el.classList.contains('warning')) {
+        statusTexto = 'Atenção';
+        statusCor = 'var(--m3-color-warning)';
+    }
+
     tooltip.innerHTML = `
         <div class="smart-tooltip-title">
-            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--m3-color-error);">warning</span>
+            <span class="material-symbols-rounded" style="font-size: 18px; color: ${statusCor};">lan</span>
             ${el.dataset.olt}
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Status:</span> 
-            <strong style="color: var(--m3-color-error);">Crítico</strong>
+            <strong style="color: ${statusCor};">${statusTexto}</strong>
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Total Offline:</span> 
-            <strong style="color: var(--m3-color-error);">${el.dataset.off}</strong>
+            <strong style="color: ${statusCor};">${el.dataset.off}</strong>
         </div>
         <div class="smart-tooltip-line">
             <span style="color: var(--m3-on-surface-variant);">Total Analisado:</span> 
@@ -67,13 +75,17 @@ window.handleNetClick = function(event) {
     if (!modal || !content) return;
 
     const el = event.currentTarget;
+    let statusCor = 'var(--m3-color-success)';
+    if (el.classList.contains('danger')) statusCor = 'var(--m3-color-error)';
+    else if (el.classList.contains('warning')) statusCor = 'var(--m3-color-warning)';
+
     content.innerHTML = `
         <h3 style="margin-top: 0; border-bottom: 1px solid var(--m3-outline); padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-            <span class="material-symbols-rounded" style="color: var(--m3-color-error);">warning</span> ${el.dataset.olt}
+            <span class="material-symbols-rounded" style="color: ${statusCor};">lan</span> ${el.dataset.olt}
         </h3>
         <div style="margin-bottom: 15px; text-align: center;">
             <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem;">Total Offline</span><br>
-            <strong style="font-size: 2.5rem; font-family: var(--font-family-mono); color: var(--m3-color-error); line-height: 1;">${el.dataset.off}</strong>
+            <strong style="font-size: 2.5rem; font-family: var(--font-family-mono); color: ${statusCor}; line-height: 1;">${el.dataset.off}</strong>
         </div>
         <div style="margin-bottom: 15px; display: flex; justify-content: space-between;">
             <div>
@@ -82,7 +94,7 @@ window.handleNetClick = function(event) {
             </div>
             <div style="text-align: right;">
                 <span style="color: var(--m3-on-surface-variant); font-size: 0.85rem;">Impacto na OLT</span><br>
-                <strong style="font-size: 1.2rem; color: var(--m3-color-error);">${el.dataset.pct}%</strong>
+                <strong style="font-size: 1.2rem; color: ${statusCor};">${el.dataset.pct}%</strong>
             </div>
         </div>
     `;
@@ -91,161 +103,118 @@ window.handleNetClick = function(event) {
 
 // ==============================================================================
 
-async function fetchGlobalOltData(olt) {
-    const range = olt.type === 'nokia' ? `${olt.sheetTab}!A:K` : `${olt.sheetTab}!A:K`;
-    
+function fetchGlobalOltData(olt) {
+    if (!window.DATA_STORE || !window.DATA_STORE.isReady) {
+        return { id: olt.id, onlineCount: 0, offlineCount: 0, type: olt.type, portData: {}, lastUpdate: '--/--/---- --:--:--' };
+    }
+
     try {
-        const data = await API.get(range);
-        const rows = (data.values || []).slice(1);
+        const values = window.DATA_STORE.olts[olt.id] || [];
+        const rows = values.slice(1);
         
         let totalOnline = 0, totalOffline = 0;
         const portData = {};
+        let lastUpdateStr = '--/--/---- --:--:--';
 
-        rows.forEach(columns => {
-            if (columns.length === 0) return;
-            let placa, porta, isOnline;
-
-            if (olt.type === 'nokia') {
-                isOnline = (columns[4] || '').trim().toLowerCase().includes('up');
-                if (columns[0]) {
-                    const match = columns[0].match(/(\d+)\/(\d+)\/(\d+)\/(\d+)/);
-                    if (match) { 
-                        placa = match[3]; 
-                        porta = match[4]; 
-                    }
-                }
-            } else { 
-                isOnline = (columns[2] || '').trim().toLowerCase() === 'active';
-                if (columns[0]) {
-                    if (olt.type === 'furukawa-10') {
-                        const parts = columns[0].split('/');
-                        if (parts.length >= 2) { placa = parts[0]; porta = parts[1]; }
-                    } else { 
-                        const match = columns[0].match(/GPON\s*(\d+)\/(\d+)/i);
-                        if (match) { placa = match[1]; porta = match[2]; }
+        if (values.length > 0) {
+            const firstRow = values[0];
+            let cellData = firstRow[10] ? String(firstRow[10]) : '';
+            if (!cellData) {
+                for (let i = firstRow.length - 1; i >= 0; i--) {
+                    let val = firstRow[i] ? String(firstRow[i]) : '';
+                    if (val.match(/\d{2}\/\d{2}/) && val.match(/\d{2}:\d{2}/)) {
+                        cellData = val; break;
                     }
                 }
             }
+            if (cellData) {
+                const dateMatch = cellData.match(/\d{2}\/\d{2}\/\d{2,4}/);
+                const timeMatch = cellData.match(/\d{2}:\d{2}(:\d{2})?/);
+                if (dateMatch && timeMatch) lastUpdateStr = `${dateMatch[0]} ${timeMatch[0]}`;
+            }
+        }
+
+        rows.forEach(columns => {
+            if (columns.length === 0) return;
+            
+            const isOnline = DataMapper.isOnline(columns[olt.type === 'nokia' ? 4 : 2], olt.type);
+            const portInfo = DataMapper.extractPort(columns[0], olt.type);
 
             if (isOnline) totalOnline++; else totalOffline++;
             
-            if (placa && porta) {
+            if (portInfo) {
+                const { placa, porta } = portInfo;
                 const portKey = `${placa}/${porta}`; 
-                if (!portData[portKey]) portData[portKey] = { off: 0, total: 0 };
+                if (!portData[portKey]) portData[portKey] = { off: 0, total: 0, placa: placa, porta: porta };
                 portData[portKey].total++;
                 if (!isOnline) portData[portKey].off++;
             }
         });
 
-        return { id: olt.id, onlineCount: totalOnline, offlineCount: totalOffline, type: olt.type, portData };
+        return { id: olt.id, onlineCount: totalOnline, offlineCount: totalOffline, type: olt.type, portData, lastUpdate: lastUpdateStr };
     } catch (error) {
-        return { id: olt.id, onlineCount: 0, offlineCount: 0, type: olt.type, portData: {} };
+        return { id: olt.id, onlineCount: 0, offlineCount: 0, type: olt.type, portData: {}, lastUpdate: '--/--/---- --:--:--' };
     }
 }
 
-function updateGlobalNetworkCard(globalOnline, globalOffline, top3Olts) {
-    const cardBody = document.querySelector('#card-global .card-body');
-    if (!cardBody) return;
-    
+function updateGlobalNetworkCard(globalOnline, globalOffline, latestUpdateStr) {
+    const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
+    if (!isHomePage) return;
+
     const total = globalOnline + globalOffline;
+    const elTotal = document.getElementById('net-total-geral');
+    const elOnline = document.getElementById('net-total-online');
+    const elOffline = document.getElementById('net-total-offline');
+    const elDate = document.getElementById('net-date');
+    const elTime = document.getElementById('net-time');
     
-    const statsHtml = `
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; width: 100%;">
-            <span class="material-symbols-rounded" style="color: var(--m3-color-success); font-size: 20px;">analytics</span>
-            <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Visão Geral</h3>
-        </div>
-        <div class="stat-item" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-bottom: 10px; align-items: center;">
-            <span class="stat-number" style="font-size: 2.3rem; display: block; text-align: left;">${total}</span>
-            <label style="font-size: 1.4rem; opacity: 0.9; margin: 0; display: flex; align-items: center; gap: 8px;"><span class="material-symbols-rounded icon-total" style="font-size: 24px;">router</span> Total Geral</label>
-        </div>
-        <div class="stat-item online" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-bottom: 8px; align-items: center;">
-            <span class="stat-number" style="font-size: 1.8rem; display: block; text-align: left; color: var(--m3-color-success);">${globalOnline}</span>
-            <label style="font-size: 1.3rem; opacity: 0.9; margin: 0; display: flex; align-items: center; gap: 8px; color: var(--m3-color-success);"><span class="material-symbols-rounded icon-up" style="font-size: 22px;">check_circle</span> Total Online</label>
-        </div>
-        <div class="stat-item offline" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center;">
-            <span class="stat-number" style="font-size: 1.8rem; display: block; text-align: left; color: var(--m3-color-error);">${globalOffline}</span>
-            <label style="font-size: 1.3rem; opacity: 0.9; margin: 0; display: flex; align-items: center; gap: 8px; color: var(--m3-color-error);"><span class="material-symbols-rounded icon-down" style="font-size: 22px;">error</span> Total Offline</label>
-        </div>
-    `;
+    if (elTotal) elTotal.textContent = total;
+    if (elOnline) elOnline.textContent = globalOnline;
+    if (elOffline) elOffline.textContent = globalOffline;
 
-    let rankingHtmlContent = `
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; width: 100%;">
-            <span class="material-symbols-rounded" style="color: var(--m3-color-success); font-size: 20px;">warning</span>
-            <h3 style="margin: 0; font-size: 1rem; color: var(--m3-on-surface);">Top 3 OLTs Críticas</h3>
-        </div>
-        <div style="flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: space-between;">
-    `;
-    
-    if (top3Olts.some(olt => olt.offline > 0)) {
-        top3Olts.forEach((olt, index) => {
-            if (olt.offline === 0) return;
-            const offlinePct = olt.total > 0 ? ((olt.offline / olt.total) * 100).toFixed(1) : 0;
-            
-            // Container atualizado com suporte a eventos de Tooltip (Hover/Click) e transições
-            rankingHtmlContent += `
-                <div style="width: 100%; margin-bottom: 10px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background-color 0.2s ease; margin-left: -8px;"
-                     data-olt="${olt.id}"
-                     data-off="${olt.offline}"
-                     data-total="${olt.total}"
-                     data-pct="${offlinePct}"
-                     onmouseenter="handleNetHover(event)"
-                     onmouseleave="handleNetLeave()"
-                     onclick="handleNetClick(event)"
-                     onmouseover="this.style.backgroundColor='rgba(255,255,255,0.05)'"
-                     onmouseout="this.style.backgroundColor='transparent'">
-                     
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px; align-items: baseline; pointer-events: none;">
-                        <strong style="color: var(--m3-on-surface); font-size: 1.1rem;">${index + 1}º ${olt.id}</strong>
-                        <span class="stat-number" style="font-size: 1.2rem; color: var(--m3-color-error); width: auto;">${olt.offline} OFF</span>
-                    </div>
-                    <div style="height: 10px; background: var(--m3-surface-container-high); border-radius: 5px; overflow: hidden; width: 100%; pointer-events: none;">
-                        <div style="height: 100%; width: ${offlinePct}%; background: var(--m3-color-error); border-radius: 5px;"></div>
-                    </div>
-                </div>
-            `;
-        });
-    } else {
-        rankingHtmlContent += `<div style="text-align: center; color: var(--m3-color-success); font-weight: 700; margin-top: 10px; width: 100%;"><span class="material-symbols-rounded" style="font-size: 40px;">sentiment_very_satisfied</span><br>Rede 100% Online!</div>`;
+    if (latestUpdateStr) {
+        const dateParts = latestUpdateStr.split(' ');
+        if (elDate) elDate.textContent = dateParts[0] || '--/--/----';
+        if (elTime) elTime.textContent = dateParts[1] || '--:--:--';
     }
-    rankingHtmlContent += `</div>`; 
-
-    cardBody.innerHTML = `
-        <div class="card-stats" style="padding-right: 15px; flex: 1; min-width: 250px; align-items: flex-start !important; text-align: left !important;">
-            ${statsHtml}
-        </div>
-        <div style="flex: 1; border-left: 1px solid var(--m3-outline); padding-left: 20px; display: flex; flex-direction: column; align-items: flex-start !important; text-align: left !important; min-width: 250px;">
-            ${rankingHtmlContent}
-        </div>
-    `;
 }
 
-async function runGlobalNetworkOverview() {
-    const oltPromises = GLOBAL_MASTER_OLT_LIST.map(olt => fetchGlobalOltData(olt));
-    const results = await Promise.all(oltPromises);
+function runGlobalNetworkOverview() {
+    const results = GLOBAL_MASTER_OLT_LIST.map(olt => fetchGlobalOltData(olt));
     
     let globalOnline = 0, globalOffline = 0;
     let oltStatsList = [], currentBackbones = new Set();
     let allProblems = new Set();
+    let latestUpdateStr = '--/--/---- --:--:--';
+
+    const rowsCircuitos = (window.DATA_STORE && window.DATA_STORE.circuitos) ? window.DATA_STORE.circuitos : [];
 
     results.forEach(result => {
         globalOnline += result.onlineCount; 
         globalOffline += result.offlineCount;
-        let total = result.onlineCount + result.offlineCount;
         
+        if (result.lastUpdate && result.lastUpdate !== '--/--/---- --:--:--') {
+            latestUpdateStr = result.lastUpdate;
+        }
+
+        let total = result.onlineCount + result.offlineCount;
         oltStatsList.push({ id: result.id, offline: result.offlineCount, total });
 
         let ports100Down = 0;
         let localProblems = []; 
+        let superPorts = []; 
         
+        const pseudoConfig = { id: result.id, oltName: result.id, type: result.type };
+
         for (const key in result.portData) {
-            const { off, total: pTotal } = result.portData[key];
+            const { off, total: pTotal, placa, porta } = result.portData[key];
             if (pTotal >= 5) {
                 let severity = null;
                 const percOffline = off / pTotal;
 
                 if (percOffline === 1) { 
                     ports100Down++; 
-                    severity = 'SUPER'; 
+                    superPorts.push({ key, placa, porta, off });
                 } else if (percOffline >= 0.5 || off >= 32) { 
                     severity = 'CRIT'; 
                 } else if (off >= 16) { 
@@ -253,63 +222,160 @@ async function runGlobalNetworkOverview() {
                 }
 
                 if (severity) {
-                    localProblems.push({ porta: key, severity: severity, off: off });
+                    const circuitoNome = DataMapper.getCircuitInfo(rowsCircuitos, pseudoConfig, placa, porta);
+                    localProblems.push({ porta: key, severity: severity, off: off, circuito: circuitoNome });
                 }
             }
         }
         
-        let filteredProblems = localProblems;
-        
         if (ports100Down >= 2) { 
-            currentBackbones.add(result.id); 
-            filteredProblems = localProblems.filter(p => p.severity !== 'SUPER');
-        } 
+            currentBackbones.add(`[${result.id}] BACKBONE::${result.offlineCount}`); 
+        } else if (ports100Down === 1) {
+            const sp = superPorts[0];
+            const circuitoNome = DataMapper.getCircuitInfo(rowsCircuitos, pseudoConfig, sp.placa, sp.porta);
+            allProblems.add(`[${result.id}] STATUS::CIRCUITO::${circuitoNome}::${sp.key}::${sp.off}`);
+        }
 
-        if (filteredProblems.length >= 2) {
-            const multiStr = filteredProblems.map(p => p.porta).join(',');
+        if (localProblems.length >= 2) {
+            const multiStr = localProblems.map(p => `${p.porta}::${p.circuito}`).join(',');
             allProblems.add(`[${result.id}] STATUS::MULTI::${multiStr}`);
         } 
-        else if (filteredProblems.length === 1) {
-            const p = filteredProblems[0];
-            allProblems.add(`[${result.id}] STATUS::${p.severity}_${p.porta}::${p.off}`);
+        else if (localProblems.length === 1) {
+            const p = localProblems[0];
+            allProblems.add(`[${result.id}] STATUS::${p.severity}_${p.porta}::${p.off}::${p.circuito}`);
         }
     });
 
     oltStatsList.sort((a, b) => b.offline - a.offline);
-    updateGlobalNetworkCard(globalOnline, globalOffline, oltStatsList.slice(0, 3));
+    updateGlobalNetworkCard(globalOnline, globalOffline, latestUpdateStr);
+
+    const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
+    
+    if (isHomePage) {
+        const targetWidescreen = document.getElementById('target-rede-widescreen');
+        if (targetWidescreen) {
+            let globalTotal = globalOnline + globalOffline;
+
+            let htmlWidescreen = `
+                <div class="resumo-card">
+                    <div>
+                        <div class="resumo-title"><span class="material-symbols-rounded" style="font-size:16px;">router_off</span> Resumo Global</div>
+                        <div class="resumo-main-val" style="color: var(--m3-color-error);">${globalOffline}</div>
+                        <div style="font-size: 0.8rem; color: var(--m3-on-surface-variant);">Clientes Offline no momento</div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; margin-top: 8px;">
+                        <span style="font-size: 0.8rem; color: var(--m3-on-surface-variant);">Clientes Online:</span>
+                        <strong style="color: var(--m3-color-success); font-size: 1rem;">${globalOnline}</strong>
+                    </div>
+                    <div class="resumo-sec-val">
+                        <span>Total Analisado:</span>
+                        <strong style="color: var(--m3-on-surface); font-size: 1rem;">${globalTotal}</strong>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="redeChart"></canvas>
+                </div>
+            `;
+            
+            targetWidescreen.innerHTML = htmlWidescreen;
+
+            if (typeof Chart !== 'undefined') {
+                const ctx = document.getElementById('redeChart').getContext('2d');
+                
+                if (window.redeChartInstance) {
+                    window.redeChartInstance.destroy();
+                }
+
+                const labels = oltStatsList.map(stat => stat.id);
+                const dataOffline = oltStatsList.map(stat => stat.offline);
+                const dataOnline = oltStatsList.map(stat => stat.total - stat.offline);
+                const dataTotal = oltStatsList.map(stat => stat.total);
+
+                const bgColors = dataOffline.map(off => off >= 15 ? 'rgba(245, 108, 108, 0.7)' : 'rgba(230, 162, 60, 0.7)');
+                const borderColors = dataOffline.map(off => off >= 15 ? 'rgba(245, 108, 108, 1)' : 'rgba(230, 162, 60, 1)');
+
+                window.redeChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Offline',
+                            data: dataOffline,
+                            backgroundColor: bgColors,
+                            borderColor: borderColors,
+                            borderWidth: 1,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    title: function(context) {
+                                        return `OLT: ${context[0].label}`;
+                                    },
+                                    label: function(context) {
+                                        const index = context.dataIndex;
+                                        const off = dataOffline[index];
+                                        const on = dataOnline[index];
+                                        const tot = dataTotal[index];
+                                        return [
+                                            `Offline: ${off}`,
+                                            `Online: ${on}`,
+                                            `Total: ${tot}`
+                                        ];
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.05)'
+                                },
+                                ticks: {
+                                    color: 'rgba(255, 255, 255, 0.6)'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    color: 'rgba(255, 255, 255, 0.6)',
+                                    maxRotation: 45,
+                                    minRotation: 0,
+                                    font: {
+                                        size: 10
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
 
     window.NETWORK_PROBLEMS_STORE = allProblems;
     window.NETWORK_BACKBONE_STORE = currentBackbones;
 }
 
 window.stopOltMonitoring = function() {
-    if (window.currentOltInterval) {
-        clearInterval(window.currentOltInterval);
-        window.currentOltInterval = null;
-    }
+    window.CURRENT_MONITORING_CONFIG = null;
 };
-
-async function fetchCircuitosData() {
-    const range = `${TAB_CIRCUITOS}!A:AK`;
-    try {
-        const data = await API.get(range);
-        return data.values || [];
-    } catch (e) { return []; }
-}
-
-async function fetchLocalidadeData() {
-    const range = `${TAB_LOCALIDADE}!A:AH`;
-    try {
-        const data = await API.get(range);
-        return data.values || [];
-    } catch (e) { 
-        console.error('Erro ao baixar aba LOCALIDADE:', e);
-        return []; 
-    }
-}
 
 window.startOltMonitoring = function(config) {
     window.stopOltMonitoring(); 
+    window.CURRENT_MONITORING_CONFIG = config;
     
     if (!document.getElementById('detail-modal')) {
         const modalHTML = `
@@ -318,7 +384,7 @@ window.startOltMonitoring = function(config) {
                     <div class="modal-header">
                         <h3 id="modal-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">Detalhes</h3>
                         <div style="display: flex; gap: 15px; align-items: center;">
-                            <button onclick="exportDetailModalToImage(event)" title="Exportar para PNG" style="background: transparent; border: none; color: var(--m3-on-surface-variant); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: color 0.2s;">
+                            <button id="btn-export-detail-png" onclick="exportDetailModalToImage(event)" title="Exportar para PNG" style="background: transparent; border: none; color: var(--m3-on-surface-variant); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: color 0.2s;">
                                 <span class="material-symbols-rounded" style="font-size: 26px;">photo_camera</span>
                             </button>
                             <button class="close-modal" onclick="closeModal()" title="Fechar">&times;</button>
@@ -342,11 +408,11 @@ window.startOltMonitoring = function(config) {
 
                         <div id="view-clients" style="display:none;">
                             <div class="filter-bar">
-                                <input type="text" id="search-input" class="filter-input" placeholder="Buscar (Nome, Serial...)" onkeyup="filterClients()">
+                                <input type="text" id="search-input" class="filter-input" placeholder="Buscar por Serial ou Código..." onkeyup="filterClients()">
                                 <select id="status-filter" class="filter-select" onchange="filterClients()"></select>
                             </div>
-                            <div class="client-table-container">
-                                <table id="table-clients">
+                            <div class="table-container">
+                                <table id="table-clients" class="noc-table">
                                     <thead id="clients-thead" class="table-header-row"></thead>
                                     <tbody id="clients-tbody"></tbody>
                                 </table>
@@ -359,50 +425,31 @@ window.startOltMonitoring = function(config) {
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     }
 
-    async function populateTables() {
+    function populateTables() {
+        if (!window.DATA_STORE || !window.DATA_STORE.isReady) return;
+
         window.CURRENT_OLT_PORT_DATA = {}; 
         window.OLT_CLIENTS_DATA = {}; 
-        const rangeOlt = `${config.id}!A:K`; 
 
         try {
-            const [dataOlt, rowsCircuitos, rowsLocalidades] = await Promise.all([
-                API.get(rangeOlt), 
-                fetchCircuitosData(),
-                fetchLocalidadeData()
-            ]);
+            const rowsCircuitos = window.DATA_STORE.circuitos || [];
+            const rowsLocalidades = window.DATA_STORE.localidades || [];
+            
+            const dataOlt = window.DATA_STORE.olts[config.oltName || config.id] || [];
 
             window.GLOBAL_BAIRROS_DATA = rowsLocalidades;
 
-            const rowsOlt = (dataOlt.values || []).slice(1);
+            const rowsOlt = dataOlt.slice(1);
 
             rowsOlt.forEach(columns => {
                 if (columns.length === 0) return;
-                let placa, porta, isOnline;
-
-                if (config.type === 'nokia') {
-                    const pon = columns[0];
-                    const status = columns[4]; 
-                    if (!pon || !status) return;
-                    const match = pon.match(/(\d+)\/(\d+)\/(\d+)\/(\d+)/);
-                    if (match) { placa = match[3]; porta = match[4]; }
-                    isOnline = status.trim().toLowerCase().includes('up');
-                } else { 
-                    const portStr = columns[0];
-                    const status = columns[2]; 
-                    if (!portStr || !status) return;
-                    
-                    if (config.type === 'furukawa-10') {
-                        const parts = portStr.split('/');
-                        if (parts.length >= 2) { placa = parts[0]; porta = parts[1]; }
-                    } else {
-                        const match = portStr.match(/GPON\s*(\d+)\/(\d+)/i);
-                        if (match) { placa = match[1]; porta = match[2]; }
-                    }
-                    isOnline = status.trim().toLowerCase() === 'active';
-                }
-
-                if (!placa || !porta) return;
                 
+                const isOnline = DataMapper.isOnline(columns[config.type === 'nokia' ? 4 : 2], config.type);
+                const portInfo = DataMapper.extractPort(columns[0], config.type);
+                
+                if (!portInfo) return;
+                
+                const { placa, porta } = portInfo;
                 const placaNum = parseInt(placa);
                 const portaNum = parseInt(porta);
                 const portKey = `${placaNum}/${portaNum}`;
@@ -412,20 +459,45 @@ window.startOltMonitoring = function(config) {
                 }
 
                 if (!window.CURRENT_OLT_PORT_DATA[placaNum][portaNum]) {
-                    const infoExtra = getGlobalCircuitInfo(rowsCircuitos, config.oltName || config.id, placa, porta, config.type);
-                    window.CURRENT_OLT_PORT_DATA[placaNum][portaNum] = { online: 0, offline: 0, info: infoExtra };
+                    const infoExtra = DataMapper.getCircuitInfo(rowsCircuitos, config, placa, porta);
+                    const bairroExtra = DataMapper.getBairroInfo(rowsLocalidades, config.oltName || config.id, placa, porta, config.type);
+                    
+                    window.CURRENT_OLT_PORT_DATA[placaNum][portaNum] = { online: 0, offline: 0, info: infoExtra, bairro: bairroExtra };
                     window.OLT_CLIENTS_DATA[portKey] = [];
                 }
 
                 if (isOnline) window.CURRENT_OLT_PORT_DATA[placaNum][portaNum].online++;
                 else window.CURRENT_OLT_PORT_DATA[placaNum][portaNum].offline++;
                 
-                let clientData = {};
+                let serialVal = '';
+                let codigoVal = '';
+                
+                // LIMPEZA DA POTÊNCIA: Remove "dBm" (qualquer case) e remove todos os espaços para isolar apenas o número
+                let potenciaVal = String(columns[5] || '').replace(/dbm/ig, '').replace(/\s+/g, '');
+                
+                let statusRefVal = '';
+                
+                // Mapeamento exclusivo: Nokia e Furukawa
                 if (config.type === 'nokia') {
-                    clientData = { colB: columns[1] || '', colC: columns[2] || '', colE: columns[4] || '', colH: columns[7] || '', colI: columns[8] || '', statusRef: columns[4] || '' };
+                    serialVal = columns[2] || '';
+                    codigoVal = columns[8] || '';
+                    statusRefVal = columns[4] || '';
                 } else {
-                    clientData = { colB: columns[1] || '', colC: columns[2] || '', colD: columns[3] || '', colH: columns[7] || '', statusRef: columns[2] || '' };
+                    serialVal = columns[3] || '';
+                    codigoVal = columns[7] || '';
+                    statusRefVal = columns[2] || '';
                 }
+                
+                let clientData = { 
+                    serial: String(serialVal).trim(), 
+                    codigo: String(codigoVal).trim(), 
+                    potencia: potenciaVal,
+                    statusRef: String(statusRefVal).trim(),
+                    oltName: config.oltName || config.id,
+                    placa: placaNum,
+                    porta: portaNum,
+                    circuito: window.CURRENT_OLT_PORT_DATA[placaNum][portaNum].info
+                };
                 
                 window.OLT_CLIENTS_DATA[portKey].push(clientData);
             });
@@ -479,11 +551,7 @@ window.startOltMonitoring = function(config) {
 
             const detalhesView = document.getElementById('olt-view-detalhes');
             if (detalhesView && detalhesView.style.display === 'block') {
-                const subtitle = document.getElementById('olt-placa-subtitle');
-                if (subtitle) {
-                    const match = subtitle.innerText.match(/Placa (\d+)/);
-                    if (match) window.openOltPlacaDetails(match[1], config.type);
-                }
+                if (window.CURRENT_VIEW_PLACA) window.openOltPlacaDetails(window.CURRENT_VIEW_PLACA, config.type);
             }
 
         } catch (error) { 
@@ -491,9 +559,8 @@ window.startOltMonitoring = function(config) {
         }
     }
 
-    const runUpdate = async () => { await populateTables(); };
-    runUpdate(); 
-    window.currentOltInterval = setInterval(runUpdate, GLOBAL_REFRESH_SECONDS * 1000); 
+    window.updateOltModal = populateTables; 
+    populateTables(); 
 }
 
 window.openOltPlacaDetails = function(placa, oltType) {
@@ -501,6 +568,17 @@ window.openOltPlacaDetails = function(placa, oltType) {
     
     document.getElementById('olt-view-placas').style.display = 'none';
     document.getElementById('olt-view-detalhes').style.display = 'block';
+
+    const modalTitle = document.getElementById('super-modal-title');
+    if (modalTitle && window.CURRENT_MONITORING_CONFIG) {
+        modalTitle.innerHTML = `<span class="material-symbols-rounded">dns</span> ${window.CURRENT_MONITORING_CONFIG.oltName}`;
+    }
+
+    const btnBoletim = document.getElementById('btn-gerar-boletim');
+    const btnComunicado = document.getElementById('btn-gerar-comunicado');
+    
+    if (btnBoletim) btnBoletim.style.display = 'none';
+    if (btnComunicado) btnComunicado.style.display = 'none';
     
     const tbody = document.getElementById('olt-detalhes-tbody');
     tbody.innerHTML = '';
@@ -509,12 +587,12 @@ window.openOltPlacaDetails = function(placa, oltType) {
     const sortedPorts = Object.keys(ports).sort((a, b) => parseInt(a) - parseInt(b));
     
     if (sortedPorts.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding: 20px; color: var(--m3-on-surface-variant);">Nenhuma porta ativa com clientes encontrada nesta placa.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px; color: var(--m3-on-surface-variant);">Nenhuma porta ativa com clientes encontrada nesta placa.</td></tr>`;
         return;
     }
 
     sortedPorts.forEach(pt => {
-        const { online, offline, info } = ports[pt];
+        const { online, offline, info, bairro } = ports[pt];
         const total = online + offline;
         
         let statusClass = 'status-normal';
@@ -528,6 +606,7 @@ window.openOltPlacaDetails = function(placa, oltType) {
         }
 
         const safeInfo = info.replace(/'/g, "\\'");
+        const textoBairro = bairro && bairro !== '-' ? bairro : 'N/A';
 
         tbody.innerHTML += `
             <tr>
@@ -538,6 +617,9 @@ window.openOltPlacaDetails = function(placa, oltType) {
                           title="Ver clientes deste circuito">
                         ${info}
                     </span>
+                </td>
+                <td style="font-family: var(--font-family-mono); font-size: 0.9rem; color: var(--m3-on-surface-variant);">
+                    ${textoBairro}
                 </td>
                 <td>
                     <button class="status ${statusClass} status-btn" style="cursor: pointer;"
@@ -550,11 +632,29 @@ window.openOltPlacaDetails = function(placa, oltType) {
     });
 };
 
+window.backToOltPlacas = function() {
+    document.getElementById('olt-view-detalhes').style.display = 'none';
+    document.getElementById('olt-view-placas').style.display = 'block';
+    
+    window.CURRENT_VIEW_PLACA = null;
+
+    const modalTitle = document.getElementById('super-modal-title');
+    if (modalTitle && window.CURRENT_MONITORING_CONFIG) {
+        modalTitle.innerHTML = `<span class="material-symbols-rounded">dns</span> ${window.CURRENT_MONITORING_CONFIG.oltName}`;
+    }
+
+    const btnBoletim = document.getElementById('btn-gerar-boletim');
+    const btnComunicado = document.getElementById('btn-gerar-comunicado');
+    
+    if (btnBoletim) btnBoletim.style.display = 'inline-block';
+    if (btnComunicado) btnComunicado.style.display = 'inline-block';
+};
+
 window.exportPlacaToTXT = function() {
     const titleEl = document.getElementById('super-modal-title');
     let oltName = 'OLT_Desconhecida';
     if (titleEl) {
-        oltName = titleEl.innerText.replace('dns', '').trim();
+        oltName = titleEl.innerText.replace('dns', '').split('-')[0].trim();
     }
     const placa = window.CURRENT_VIEW_PLACA || '?';
     
@@ -573,12 +673,13 @@ window.exportPlacaToTXT = function() {
     
     rows.forEach(row => {
         const cols = row.querySelectorAll('td');
-        if (cols.length >= 3) {
+        if (cols.length >= 4) { 
             const porta = cols[0].innerText.trim();
             const circuito = cols[1].innerText.trim();
-            const status = cols[2].innerText.trim();
+            const localidade = cols[2].innerText.trim();
+            const status = cols[3].innerText.trim();
             
-            txtContent += `• ${porta.padEnd(10, ' ')} | Circuito: ${circuito.padEnd(25, ' ')} | Status: ${status}\n`;
+            txtContent += `• ${porta.padEnd(10, ' ')} | Circuito: ${circuito.padEnd(10, ' ')} | Bairro: ${localidade.padEnd(45, ' ')} | Status: ${status}\n`;
         }
     });
     
@@ -609,10 +710,28 @@ window.exportDetailModalToImage = function(event) {
     const titleEl = document.getElementById('modal-title');
     let titleName = 'Detalhes';
     if (titleEl) {
-        titleName = titleEl.innerText.replace(/[^a-zA-Z0-9-]/g, '_');
+        titleName = titleEl.textContent.replace(/[^a-zA-Z0-9-]/g, '_');
     }
 
-    html2canvas(modalContent, {
+    const clone = modalContent.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.top = '-9999px';
+    clone.style.left = '-9999px';
+    
+    if (!modalContent.classList.contains('modal-large')) {
+        clone.style.width = '500px'; 
+    } else {
+        clone.style.width = modalContent.offsetWidth + 'px';
+    }
+    
+    document.body.appendChild(clone);
+
+    const viewStats = clone.querySelector('#view-stats');
+    const viewClients = clone.querySelector('#view-clients');
+    if (viewStats && modalContent.querySelector('#view-stats').style.display !== 'none') viewStats.style.display = 'flex';
+    if (viewClients && modalContent.querySelector('#view-clients').style.display !== 'none') viewClients.style.display = 'block';
+
+    html2canvas(clone, {
         backgroundColor: null, 
         scale: 2, 
         useCORS: true,
@@ -623,10 +742,12 @@ window.exportDetailModalToImage = function(event) {
         link.href = canvas.toDataURL('image/png');
         link.click();
         
+        document.body.removeChild(clone);
         if (btn) btn.innerHTML = originalContent;
     }).catch(error => {
         console.error('Erro ao gerar imagem:', error);
         alert('Ocorreu um erro ao exportar a imagem.');
+        if (clone.parentNode) document.body.removeChild(clone);
         if (btn) btn.innerHTML = originalContent;
     });
 };
@@ -635,12 +756,15 @@ window.closeModal = function(event) {
     if (event && event.target.id !== 'detail-modal' && !event.target.classList.contains('close-modal')) return;
     const modal = document.getElementById('detail-modal');
     if (modal) modal.style.display = 'none';
-}
+};
 
 window.openPortDetails = function(placa, porta, circuito, online, offline, total) {
     const modal = document.getElementById('detail-modal');
     const modalContent = document.querySelector('#detail-modal .modal-content');
     modalContent.classList.remove('modal-large'); 
+
+    const btnPng = document.getElementById('btn-export-detail-png');
+    if (btnPng) btnPng.style.display = 'inline-block';
 
     const textoCircuito = (circuito && circuito !== "-") ? ` - Circuito: ${circuito}` : "";
     document.getElementById('modal-title').textContent = `Placa ${placa} / Porta ${porta}${textoCircuito}`;
@@ -650,15 +774,17 @@ window.openPortDetails = function(placa, porta, circuito, online, offline, total
     document.getElementById('modal-down').textContent = offline;
     document.getElementById('modal-total').textContent = total;
     modal.style.display = 'flex';
-}
+};
 
 window.openCircuitClients = function(placa, porta, circuitoNome, oltType) {
     const modal = document.getElementById('detail-modal');
     const modalContent = document.querySelector('#detail-modal .modal-content');
     modalContent.classList.add('modal-large');     
 
-    const textoCircuito = (circuitoNome && circuitoNome !== "-") ? ` - Circuito: ${circuitoNome}` : "";
-    document.getElementById('modal-title').textContent = `Placa ${placa} / Porta ${porta}${textoCircuito}`;
+    const btnPng = document.getElementById('btn-export-detail-png');
+    if (btnPng) btnPng.style.display = 'none';
+
+    document.getElementById('modal-title').innerHTML = `<span class="material-symbols-rounded" style="margin-right: 8px;">manage_search</span> Pesquisa de Clientes e Equipamentos`;
 
     document.getElementById('view-stats').style.display = 'none';
     document.getElementById('view-clients').style.display = 'block';
@@ -676,63 +802,113 @@ window.openCircuitClients = function(placa, porta, circuitoNome, oltType) {
     const thead = document.getElementById('clients-thead');
     const tbody = document.getElementById('clients-tbody');
     
-    if (oltType === 'nokia') {
-        thead.innerHTML = `<tr><th>Posição</th><th>Serial</th><th>Status</th><th>Descrição 1</th><th>Descrição 2</th></tr>`;
-    } else {
-        thead.innerHTML = `<tr><th>Posição</th><th>Status</th><th>Serial</th><th>Descrição</th></tr>`;
-    }
-    
+    // Título unificado para a linha rica
+    thead.innerHTML = `<tr><th style="text-align: left; padding-left: 15px;">Detalhes do Equipamento e Assinante</th></tr>`;
     tbody.innerHTML = '';
 
     const portKey = `${placa}/${porta}`;
     const clients = window.OLT_CLIENTS_DATA[portKey] || [];
 
     if (clients.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${oltType === 'nokia' ? 5 : 4}" style="text-align:center;">Nenhum cliente encontrado.</td></tr>`;
+        tbody.innerHTML = `<tr><td style="text-align:center;">Nenhum cliente encontrado.</td></tr>`;
     } else {
         clients.forEach(c => {
             let statusRaw = c.statusRef.toLowerCase();
             let statusClass = 'filter-unknown';
+            let statusText = 'UNKNOWN';
+            
             if (oltType === 'nokia') {
-                if (statusRaw.includes('up')) statusClass = 'filter-online';
-                else if (statusRaw.includes('down')) statusClass = 'filter-offline';
+                if (statusRaw.includes('up')) { statusClass = 'filter-online'; statusText = 'UP'; }
+                else if (statusRaw.includes('down')) { statusClass = 'filter-offline'; statusText = 'DOWN'; }
             } else {
-                if (statusRaw.includes('active') && !statusRaw.includes('inactive')) statusClass = 'filter-online';
-                else if (statusRaw.includes('inactive')) statusClass = 'filter-offline';
+                if (statusRaw.includes('active') && !statusRaw.includes('inactive')) { statusClass = 'filter-online'; statusText = 'UP'; }
+                else if (statusRaw.includes('inactive')) { statusClass = 'filter-offline'; statusText = 'DOWN'; }
             }
             
-            let rowHTML = '';
-            if (oltType === 'nokia') {
-                rowHTML = `<tr class="client-row ${statusClass}"><td>${c.colB}</td><td>${c.colC}</td><td>${c.colE}</td><td>${c.colH}</td><td>${c.colI}</td></tr>`;
-            } else {
-                rowHTML = `<tr class="client-row ${statusClass}"><td>${c.colB}</td><td>${c.colC}</td><td>${c.colD}</td><td>${c.colH}</td></tr>`;
-            }
+            let buttonClass = statusClass === 'filter-online' ? 'status-normal' : 'status-critico';
+            if (statusClass === 'filter-unknown') buttonClass = 'status-atencao';
+            
+            // Geração da linha rica focada em colunas verticais
+            let rowHTML = `
+                <tr class="client-row ${statusClass}" data-serial="${c.serial}" data-codigo="${c.codigo}">
+                    <td style="padding: 15px;">
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            
+                            <div style="display: flex; align-items: center; gap: 6px;" title="Serial do Equipamento">
+                                <span class="material-symbols-rounded" style="color: var(--m3-color-primary);">barcode</span> 
+                                <strong style="font-family: var(--font-family-mono); font-size: 1.05rem;">${c.serial || 'N/A'}</strong>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; gap: 6px;" title="Código do Cliente">
+                                <span class="material-symbols-rounded" style="color: var(--m3-color-primary);">deployed_code_account</span> 
+                                <strong style="font-family: var(--font-family-mono); font-size: 1.05rem;">${c.codigo || 'N/A'}</strong>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Nome da OLT">
+                                <span class="material-symbols-rounded" style="font-size: 20px;">dns</span> ${c.oltName}
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Placa/Porta">
+                                <span class="material-symbols-rounded" style="font-size: 20px;">developer_board</span> ${c.placa}/${c.porta}
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Circuito">
+                                <span class="material-symbols-rounded" style="font-size: 20px;">network_node</span> ${c.circuito}
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Potência (dBm)">
+                                <span class="material-symbols-rounded" style="font-size: 20px;">infrared</span> ${c.potencia || 'N/A'} dBm
+                            </div>
+
+                            <div style="margin-top: 4px;">
+                                <button class="status-btn ${buttonClass}" style="display: inline-flex; align-items: center; gap: 6px; cursor: default; pointer-events: none; border-radius: 8px;">
+                                    <span class="material-symbols-rounded" style="font-size: 20px;">online_prediction</span> ${statusText}
+                                </button>
+                            </div>
+
+                        </div>
+                    </td>
+                </tr>
+            `;
             tbody.innerHTML += rowHTML;
         });
     }
     modal.style.display = 'flex';
-}
+};
 
 window.filterClients = function() {
-    const searchText = document.getElementById('search-input').value.toLowerCase();
+    const searchText = document.getElementById('search-input').value.toLowerCase().trim();
     const statusFilter = document.getElementById('status-filter').value;
     const rows = document.querySelectorAll('.client-row');
     
     rows.forEach(row => {
-        const textContent = row.textContent.toLowerCase();
-        let matchesSearch = textContent.includes(searchText);
+        const serial = (row.dataset.serial || '').toLowerCase();
+        const codigo = (row.dataset.codigo || '').toLowerCase();
+        
+        // A busca é cirúrgica avaliando exclusivamente as tags
+        let matchesSearch = searchText === '' || serial.includes(searchText) || codigo.includes(searchText);
+        
         let matchesStatus = true;
         if (statusFilter === 'online') matchesStatus = row.classList.contains('filter-online');
         if (statusFilter === 'offline') matchesStatus = row.classList.contains('filter-offline');
         
-        if (matchesSearch && matchesStatus) row.style.display = '';
-        else row.style.display = 'none';
+        if (matchesSearch && matchesStatus) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
     });
-}
+};
 
-document.addEventListener('DOMContentLoaded', () => {
-    if (checkIsHomePage()) {
+// OUVINTE DO MAESTRO CENTRAL (data-store.js)
+window.addEventListener('dadosAtualizados', () => {
+    const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
+    
+    if (isHomePage) {
         runGlobalNetworkOverview();
-        setInterval(runGlobalNetworkOverview, GLOBAL_REFRESH_SECONDS * 1000);
+    }
+    
+    if (window.CURRENT_MONITORING_CONFIG && typeof window.updateOltModal === 'function') {
+        window.updateOltModal();
     }
 });

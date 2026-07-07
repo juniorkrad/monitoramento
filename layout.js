@@ -1,5 +1,6 @@
 // ==============================================================================
 // layout.js - Construtor de Layout e Menu Inteligente (Com Busca e Emergência Autenticada)
+// Atualização: Limpeza da formatação de dBm na Busca Global
 // ==============================================================================
 
 (function loadIconFont() {
@@ -24,14 +25,14 @@ function loadHeader(config) {
     const currentPage = path.split('/').pop() || 'index.html';
 
     let navHtml = `
-        <button class="icon-btn" onclick="toggleSidebar()" title="Abrir Menu" style="border-radius: 8px; width: auto; padding: 8px 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; color: var(--m3-on-surface); transition: background 0.2s;">
+        <button class="icon-btn" onclick="toggleSidebar()" title="Abrir Menu" style="border-radius: 8px; width: auto; padding: 8px 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; color: var(--m3-on-surface); transition: background-color 0.2s, box-shadow 0.2s;">
             <span class="material-symbols-rounded">menu</span>
         </button>
     `;
     
     loadSidebar(currentPage);
-    injectSearchModal(); // Injeta Modal de Busca
-    injectEmergencyModal(); // Injeta Modal de Emergência
+    injectSearchModal(); 
+    injectEmergencyModal(); 
 
     headerPlaceholder.innerHTML = `
         <header class="header">
@@ -81,11 +82,6 @@ function loadSidebar(currentPage) {
                     STATUS OLTS
                 </a>
                 
-                <a href="equipamentos.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
-                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">router</span>
-                    EQUIPAMENTOS
-                </a>
-
                 <a href="energia.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">bolt</span>
                     ENERGIA
@@ -101,11 +97,16 @@ function loadSidebar(currentPage) {
                     TEMPERATURA
                 </a>
 
+                <a href="equipamentos.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
+                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">router</span>
+                    EQUIPAMENTOS
+                </a>
+
                 <div class="sidebar-divider" style="margin: 15px 0;"></div>
                 
                 <a href="#" onclick="openSearchModal(); return false;" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left; background-color: var(--m3-surface-container-highest);">
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px; color: var(--m3-primary);">manage_search</span>
-                    BUSCAR SERIAL
+                    BUSCAR CLIENTE
                 </a>
 
                 <a href="#" onclick="checkAuthAndOpenEmergency(); return false;" class="sidebar-link home-highlight bg-danger-highlight text-danger" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
@@ -133,8 +134,13 @@ function loadFooter() {
     const currentYear = new Date().getFullYear();
     footerPlaceholder.innerHTML = `
         <footer class="footer">
-            <p>© ${currentYear} Painel de Monitoramento | Desenvolvido por 👤@juniorkrad + 🤖Gemini</p>
-            <p style="font-size: 0.75rem; margin-top: 6px; opacity: 0.7; font-weight: 400;">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span>© ${currentYear} Painel de Monitoramento | Desenvolvido por</span>
+                <span class="material-symbols-rounded" style="font-size: 16px; font-variation-settings: 'FILL' 1;">person</span> @juniorkrad 
+                <span>+</span>
+                <span class="material-symbols-rounded" style="font-size: 16px; font-variation-settings: 'FILL' 1;">smart_toy</span> Gemini
+            </div>
+            <p style="font-size: 0.75rem; margin-top: 6px; opacity: 0.7; font-weight: 400; margin-bottom: 0;">
                 Todos os direitos reservados. Projeto registrado. Proibida a reprodução não autorizada.
             </p>
         </footer>
@@ -152,12 +158,12 @@ function injectSearchModal() {
         <div class="search-modal-overlay" id="search-serial-modal" onclick="closeSearchModal(event)">
             <div class="search-modal" onclick="event.stopPropagation()">
                 <div class="search-modal-header">
-                    <h2><span class="material-symbols-rounded">manage_search</span> Localizar Equipamento</h2>
+                    <h2><span class="material-symbols-rounded">manage_search</span> Pesquisa de Clientes e Equipamentos</h2>
                     <button class="search-close-btn" onclick="closeSearchModal()" title="Fechar"><span class="material-symbols-rounded">close</span></button>
                 </div>
                 
                 <div class="search-input-group">
-                    <input type="text" id="serial-search-input" class="search-input" placeholder="Digite no mínimo 4 dígitos finais..." autocomplete="off" onkeypress="if(event.key === 'Enter') executeSerialSearch()">
+                    <input type="text" id="serial-search-input" class="search-input" placeholder="Buscar por Serial ou Código..." autocomplete="off" onkeypress="if(event.key === 'Enter') executeSerialSearch()">
                     <button class="search-btn" onclick="executeSerialSearch()" title="Pesquisar">
                         <span class="material-symbols-rounded" style="font-size: 28px;">search</span>
                     </button>
@@ -165,7 +171,7 @@ function injectSearchModal() {
                 
                 <div id="search-results-area" class="search-results-container">
                     <div style="text-align:center; color: var(--m3-on-surface-variant); padding: 20px; font-size: 0.95rem;">
-                        O sistema fará uma varredura em todas as OLTs cadastradas. Você pode colar o serial completo ou apenas o trecho final (ex: FHTT123456 ou 3456).
+                        O sistema fará uma varredura cirúrgica em todas as OLTs cadastradas. Você pode buscar pelo Serial completo do equipamento, Código do cliente ou trechos finais.
                     </div>
                 </div>
             </div>
@@ -203,7 +209,7 @@ async function executeSerialSearch() {
         return;
     }
     
-    const searchTarget = input.length >= 8 ? input.slice(-8) : input;
+    const searchTarget = input;
 
     resultsArea.innerHTML = `
         <div class="search-loading">
@@ -220,6 +226,9 @@ async function executeSerialSearch() {
 
         let foundResults = [];
         
+        // Puxa os circuitos uma vez para não ter que buscar repetidamente
+        const rowsCircuitos = (window.DATA_STORE && window.DATA_STORE.circuitos) ? window.DATA_STORE.circuitos : [];
+        
         const fetchPromises = GLOBAL_MASTER_OLT_LIST.map(async (olt) => {
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${GLOBAL_SHEET_ID}/values/${olt.sheetTab}!A:Z?key=${GLOBAL_API_KEY}`;
             try {
@@ -231,35 +240,79 @@ async function executeSerialSearch() {
                 for (let i = 1; i < data.values.length; i++) {
                     const row = data.values[i];
                     
-                    for (let j = 0; j < row.length; j++) {
-                        const cellVal = String(row[j]).toUpperCase().trim();
+                    let serialVal = '';
+                    let codigoVal = '';
+                    
+                    // LIMPEZA DA POTÊNCIA: Remove "dBm" (qualquer case) e remove todos os espaços para isolar apenas o número
+                    let potenciaVal = String(row[5] || '').replace(/dbm/ig, '').replace(/\s+/g, '');
+                    
+                    let colStatus = 2;
+
+                    // Mapeamento focado: Nokia e Furukawa
+                    if (olt.type === 'nokia') {
+                        serialVal = String(row[2] || '').toUpperCase().trim();
+                        codigoVal = String(row[8] || '').toUpperCase().trim();
+                        colStatus = 4;
+                    } else { // Furukawa
+                        serialVal = String(row[3] || '').toUpperCase().trim();
+                        codigoVal = String(row[7] || '').toUpperCase().trim();
+                        colStatus = 2;
+                    }
+                    
+                    if ((serialVal && (serialVal.endsWith(searchTarget) || serialVal.includes(searchTarget))) || 
+                        (codigoVal && (codigoVal.endsWith(searchTarget) || codigoVal.includes(searchTarget)))) {
                         
-                        if (cellVal.endsWith(searchTarget) || cellVal.includes(searchTarget)) {
-                            
-                            let statusStr = "Desconhecido";
-                            let statusClass = "status-unknown";
-                            
-                            let colStatus = (olt.type === 'nokia') ? 4 : 2;
+                        let statusStr = "UNKNOWN";
+                        let statusClass = "status-unknown";
+                        
+                        let isOnline = false;
+                        if (typeof DataMapper !== 'undefined') {
+                            isOnline = DataMapper.isOnline(row[colStatus], olt.type);
+                        } else {
                             let statusCell = row[colStatus] ? String(row[colStatus]).toUpperCase().trim() : '';
-                            
-                            if (statusCell.includes("UP") || statusCell === "ACTIVE") { 
-                                statusStr = "UP"; 
-                                statusClass = "status-up"; 
-                            } else if (statusCell.includes("DOWN") || statusCell.includes("OFFLINE") || statusCell === "INACTIVE" || statusCell === "FAIL" || statusCell === "LOS") { 
-                                statusStr = "DOWN"; 
-                                statusClass = "status-down"; 
-                            }
-                            
-                            foundResults.push({
-                                serial: cellVal,
-                                oltName: olt.id || olt.sheetTab,
-                                porta: row[0] || "N/A", 
-                                status: statusStr,
-                                statusClass: statusClass
-                            });
-                            
-                            break; 
+                            isOnline = statusCell.includes("UP") || statusCell === "ACTIVE";
                         }
+                        
+                        if (isOnline) { 
+                            statusStr = "UP"; 
+                            statusClass = "status-up"; 
+                        } else { 
+                            statusStr = "DOWN"; 
+                            statusClass = "status-down"; 
+                        }
+
+                        let portaFull = row[0] || "N/A";
+                        let placa = "-";
+                        let porta = "-";
+                        let circuitoNome = "-";
+
+                        if (typeof DataMapper !== 'undefined') {
+                            const portInfo = DataMapper.extractPort(portaFull, olt.type);
+                            if (portInfo) {
+                                placa = portInfo.placa;
+                                porta = portInfo.porta;
+                                const pseudoConfig = { id: olt.id || olt.sheetTab, oltName: olt.id || olt.sheetTab, type: olt.type };
+                                circuitoNome = DataMapper.getCircuitInfo(rowsCircuitos, pseudoConfig, placa, porta);
+                            } else {
+                                const parts = String(portaFull).split('/');
+                                if(parts.length >= 2) {
+                                    placa = parts[parts.length-2];
+                                    porta = parts[parts.length-1];
+                                }
+                            }
+                        }
+
+                        foundResults.push({
+                            serial: serialVal,
+                            codigo: codigoVal,
+                            oltName: olt.id || olt.sheetTab,
+                            placa: placa,
+                            porta: porta,
+                            circuito: circuitoNome,
+                            potencia: potenciaVal,
+                            status: statusStr,
+                            statusClass: statusClass
+                        });
                     }
                 }
             } catch(e) {
@@ -273,7 +326,7 @@ async function executeSerialSearch() {
             resultsArea.innerHTML = `
                 <div style="text-align:center; padding: 30px; color: var(--m3-on-surface-variant);">
                     <span class="material-symbols-rounded" style="font-size: 40px; margin-bottom: 10px; opacity: 0.5;">search_off</span><br>
-                    Nenhum equipamento correspondente a <b>"${input}"</b> foi encontrado nas OLTs.
+                    Nenhum cliente correspondente a <b>"${input}"</b> foi encontrado nas OLTs.
                 </div>
             `;
             return;
@@ -282,22 +335,40 @@ async function executeSerialSearch() {
         let html = '';
         foundResults.forEach(res => {
             html += `
-                <div class="search-result-card">
-                    <div class="search-result-card-row">
-                        <span class="material-symbols-rounded">barcode</span>
-                        <span class="search-result-val">${res.serial}</span>
-                    </div>
-                    <div class="search-result-row">
-                        <span class="material-symbols-rounded">dns</span>
-                        <span class="search-result-val">${res.oltName}</span>
-                    </div>
-                    <div class="search-result-row">
-                        <span class="material-symbols-rounded">settings_input_component</span>
-                        <span class="search-result-val">${res.porta}</span>
-                    </div>
-                    <div class="search-result-row" style="margin-top: 5px;">
-                        <span class="material-symbols-rounded">online_prediction</span>
-                        <span class="search-result-status ${res.statusClass}">${res.status}</span>
+                <div class="search-result-card" style="padding: 15px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        
+                        <div style="display: flex; align-items: center; gap: 6px;" title="Serial do Equipamento">
+                            <span class="material-symbols-rounded" style="color: var(--m3-color-primary);">barcode</span> 
+                            <strong style="font-family: var(--font-family-mono); font-size: 1.05rem;">${res.serial || 'N/A'}</strong>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 6px;" title="Código do Cliente">
+                            <span class="material-symbols-rounded" style="color: var(--m3-color-primary);">deployed_code_account</span> 
+                            <strong style="font-family: var(--font-family-mono); font-size: 1.05rem;">${res.codigo || 'N/A'}</strong>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Nome da OLT">
+                            <span class="material-symbols-rounded" style="font-size: 20px;">dns</span> ${res.oltName}
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Placa/Porta">
+                            <span class="material-symbols-rounded" style="font-size: 20px;">developer_board</span> ${res.placa}/${res.porta}
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Circuito">
+                            <span class="material-symbols-rounded" style="font-size: 20px;">network_node</span> ${res.circuito}
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Potência (dBm)">
+                            <span class="material-symbols-rounded" style="font-size: 20px;">infrared</span> ${res.potencia || 'N/A'} dBm
+                        </div>
+
+                        <div style="margin-top: 4px;">
+                            <span class="search-result-status ${res.statusClass}" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.95rem;">
+                                <span class="material-symbols-rounded" style="font-size: 20px;">online_prediction</span> ${res.status}
+                            </span>
+                        </div>
                     </div>
                 </div>
             `;
@@ -563,7 +634,7 @@ function startEmergencyTimer(oltId, totalSeconds) {
 }
 
 // ==============================================================================
-// UTILITÁRIOS GLOBAIS RECUPERADOS E BLINDADOS (CORREÇÃO DE EXECUÇÃO FATAL)
+// UTILITÁRIOS GLOBAIS DE UI
 // ==============================================================================
 
 function checkIsHomePage() {
@@ -591,57 +662,6 @@ function updateGlobalTimestamp() {
     timestampEl.classList.add('updated-anim');
 }
 
-function getGlobalCircuitInfo(rowsCircuitos, oltIdentifier, placa, porta, type) {
-    const oltConfig = GLOBAL_MASTER_OLT_LIST.find(o => o.id === oltIdentifier || o.sheetTab === oltIdentifier);
-    if (!oltConfig || oltConfig.circuitCol === undefined) return "-";
-    
-    const colIndex = oltConfig.circuitCol;
-    if (!rowsCircuitos || !rowsCircuitos.length) return "-";
-
-    let rowIndex = -1;
-    const p = parseInt(porta);
-    const sl = parseInt(placa);
-
-    if (type === 'nokia') rowIndex = ((sl - 1) * 16) + (p - 1) + 1;
-    else if (type === 'furukawa-2') rowIndex = ((sl - 1) * 16) + (p - 1) + 1;
-    else if (type === 'furukawa-10') rowIndex = ((sl - 1) * 4) + (p - 1) + 1;
-
-    if (rowIndex > 0 && rowIndex < rowsCircuitos.length) {
-        return rowsCircuitos[rowIndex][colIndex] || "-";
-    }
-    return "-";
-}
-
-function getGlobalBairroInfo(rowsLocalidades, oltIdentifier, placa, porta, type) {
-    if (!rowsLocalidades || !rowsLocalidades.length) return null;
-
-    const cleanOlt = (oltIdentifier || "").toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-    const bairroColMap = {
-        'HEL1': 1,  'HEL2': 3,  'MGP': 5,   'PQA1': 7,  'PSV1': 9,  
-        'PSV7': 11, 'SBO2': 13, 'SBO3': 15, 'SBO4': 17, 'SB1': 19,  
-        'SB2': 21,  'SB3': 23,  'PQA2': 25, 'PQA3': 27, 'LTXV2': 29,
-        'LTXV1': 31, 'SBO1': 33  
-    };
-
-    const colIndex = bairroColMap[cleanOlt];
-    if (colIndex === undefined) return null;
-
-    let rowIndex = -1;
-    const p = parseInt(porta);
-    const sl = parseInt(placa);
-
-    if (type === 'nokia') rowIndex = ((sl - 1) * 16) + (p - 1) + 1;
-    else if (type === 'furukawa-2') rowIndex = ((sl - 1) * 16) + (p - 1) + 1;
-    else if (type === 'furukawa-10') rowIndex = ((sl - 1) * 4) + (p - 1) + 1;
-
-    if (rowIndex > 0 && rowIndex < rowsLocalidades.length) {
-        const bairro = rowsLocalidades[rowIndex][colIndex];
-        return bairro ? bairro.trim() : null;
-    }
-    return null;
-}
-
 async function loadTimestamp(sheetTab, apiKey, sheetId) {
     updateGlobalTimestamp();
 }
@@ -651,7 +671,7 @@ async function loadTimestamp(sheetTab, apiKey, sheetId) {
 // ==============================================================================
 function initAutoHide() {
     let idleTimer;
-    const idleTime = 10000; // 10 segundos de inatividade para ocultar
+    const idleTime = 10000; 
 
     const resetTimer = () => {
         document.body.classList.remove('idle');
