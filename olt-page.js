@@ -162,6 +162,7 @@ function openSuperModal(id, sheetTab, type, boards) {
         modalTitle.innerHTML = `<span class="material-symbols-rounded">dns</span> ${id}`;
     }
 
+    /* Botões temporariamente ocultos
     const btnBoletim = document.getElementById('btn-gerar-boletim');
     const btnComunicado = document.getElementById('btn-gerar-comunicado');
     const btnExportTxt = document.getElementById('btn-export-geral-txt');
@@ -169,6 +170,7 @@ function openSuperModal(id, sheetTab, type, boards) {
     if (btnBoletim) btnBoletim.style.display = 'inline-block';
     if (btnComunicado) btnComunicado.style.display = 'inline-block';
     if (btnExportTxt) btnExportTxt.style.display = 'inline-block';
+    */
 
     const placasList = document.getElementById('olt-placas-list');
     if (placasList) {
@@ -202,6 +204,7 @@ function closeSuperModal(event) {
     document.getElementById('olt-view-detalhes').style.display = 'none';
     document.getElementById('olt-view-placas').style.display = 'block';
 
+    /* Botões temporariamente ocultos
     const btnBoletim = document.getElementById('btn-gerar-boletim');
     const btnComunicado = document.getElementById('btn-gerar-comunicado');
     const btnExportTxt = document.getElementById('btn-export-geral-txt');
@@ -209,6 +212,7 @@ function closeSuperModal(event) {
     if (btnBoletim) btnBoletim.style.display = 'none';
     if (btnComunicado) btnComunicado.style.display = 'none';
     if (btnExportTxt) btnExportTxt.style.display = 'none';
+    */
 
     if (typeof stopOltMonitoring === 'function') {
         stopOltMonitoring();

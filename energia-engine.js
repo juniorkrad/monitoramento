@@ -495,8 +495,10 @@ window.openEnergySuperModal = function(id) {
     document.getElementById('energy-view-detalhes').style.display = 'none';
     document.getElementById('energy-view-placas').style.display = 'block';
     
+    /* Botão oculto temporariamente
     const btnBoletim = document.getElementById('btn-gerar-boletim-energia');
     if (btnBoletim) btnBoletim.style.display = 'inline-block';
+    */
 
     modal.style.display = 'flex';
     populateEnergyModal(id);
@@ -676,8 +678,10 @@ window.backToEnergyPlacas = function() {
     document.getElementById('energy-view-detalhes').style.display = 'none';
     document.getElementById('energy-view-placas').style.display = 'block';
 
+    /* Botão oculto temporariamente
     const btnBoletim = document.getElementById('btn-gerar-boletim-energia');
     if (btnBoletim) btnBoletim.style.display = 'inline-block';
+    */
 };
 
 document.addEventListener('DOMContentLoaded', () => {

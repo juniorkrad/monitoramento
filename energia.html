@@ -41,9 +41,11 @@
                     <span class="material-symbols-rounded">dns</span> Detalhes da OLT
                 </h3>
                 <div style="display: flex; gap: 15px; align-items: center;">
+                    <!-- Botão oculto temporariamente
                     <button id="btn-gerar-boletim-energia" onclick="window.gerarRelatorioEnergiaOffscreen(event)" class="card-header-button" title="Gerar Boletim de Energia" style="display: none;">
                         <span class="material-symbols-rounded">warning</span>
                     </button>
+                    -->
                     <button class="close-modal" onclick="closeSuperModal()">&times;</button>
                 </div>
             </div>
@@ -83,6 +85,7 @@
 
     <div id="footer-placeholder"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="config.js"></script>
     <script src="api-service.js"></script>
     <script src="data-mapper.js"></script>
@@ -94,6 +97,7 @@
     <script src="energia-engine.js"></script> 
     <script src="energia-relatorio.js"></script>
     <script src="relatorio-pdf.js"></script>
+    <script src="boletim-gerencial.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

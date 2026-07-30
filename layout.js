@@ -1,6 +1,6 @@
 // ==============================================================================
 // layout.js - Construtor de Layout e Menu Inteligente (Com Busca e Emergência Autenticada)
-// Atualização: Injeção do Modal de Relatório PDF e Inclusão de Botão no Menu
+// Atualização: Injeção dos Modais de Relatório PDF e Boletim Gerencial
 // ==============================================================================
 
 (function loadIconFont() {
@@ -34,6 +34,7 @@ function loadHeader(config) {
     injectSearchModal(); 
     injectEmergencyModal(); 
     injectRelatorioModal();
+    injectBoletimModal();
 
     headerPlaceholder.innerHTML = `
         <header class="header">
@@ -115,6 +116,11 @@ function loadSidebar(currentPage) {
                     BUSCAR CLIENTE
                 </a>
 
+                <a href="#" onclick="if(window.openBoletimModal) window.openBoletimModal(); return false;" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left; background-color: var(--m3-surface-container-highest);">
+                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px; color: var(--m3-primary);">insert_chart</span>
+                    GERAR BOLETIM
+                </a>
+
                 <a href="#" onclick="if(window.openRelatorioModal) window.openRelatorioModal(); return false;" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left; background-color: var(--m3-surface-container-highest);">
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px; color: var(--m3-primary);">picture_as_pdf</span>
                     GERAR RELATÓRIO
@@ -156,6 +162,72 @@ function loadFooter() {
             </p>
         </footer>
     `;
+}
+
+// ==============================================================================
+// SISTEMA DE BOLETIM GERENCIAL (MODAL)
+// ==============================================================================
+
+function injectBoletimModal() {
+    if (document.getElementById('boletim-gerencial-modal')) return;
+
+    let popOptions = '<option value="">Selecione o POP</option>';
+    if (typeof POP_MAP !== 'undefined') {
+        const uniquePops = [...new Set(Object.values(POP_MAP))].sort();
+        uniquePops.forEach(pop => {
+            popOptions += `<option value="${pop}">${pop}</option>`;
+        });
+    }
+
+    const modalHtml = `
+        <div class="search-modal-overlay" id="boletim-gerencial-modal" onclick="if(window.closeBoletimModal) window.closeBoletimModal(event)">
+            <div class="search-modal" onclick="event.stopPropagation()">
+                <div class="search-modal-header">
+                    <h2><span class="material-symbols-rounded">insert_chart</span> Gerar Boletim Gerencial</h2>
+                    <button class="search-close-btn" onclick="if(window.closeBoletimModal) window.closeBoletimModal()" title="Fechar"><span class="material-symbols-rounded">close</span></button>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 10px;">
+                    
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 16px;">
+                        <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--m3-primary); display: flex; align-items: center; gap: 8px;"><span class="material-symbols-rounded">domain</span> Boletim por POP</h3>
+                        <p style="font-size: 0.9rem; color: var(--m3-on-surface-variant); margin-bottom: 15px;">Gera um relatório detalhado do status de um POP específico, listando suas OLTs.</p>
+                        <select id="boletim-pop-select" class="filter-select" style="width: 100%; margin-bottom: 15px;">
+                            ${popOptions}
+                        </select>
+                        <button class="search-btn" style="width: 100%; padding: 12px; font-weight: bold; gap: 8px;" onclick="if(window.gerarBoletimPop) window.gerarBoletimPop(event)">
+                            <span class="material-symbols-rounded">download</span> GERAR BOLETIM DO POP
+                        </button>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 16px;">
+                        <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--m3-primary); display: flex; align-items: center; gap: 8px;"><span class="material-symbols-rounded">public</span> Boletim Geral da Rede</h3>
+                        <p style="font-size: 0.9rem; color: var(--m3-on-surface-variant); margin-bottom: 15px;">Gera um relatório consolidado com a visão macro de todos os POPs e da rede como um todo.</p>
+                        <button class="search-btn" style="width: 100%; padding: 12px; font-weight: bold; gap: 8px;" onclick="if(window.gerarBoletimGeral) window.gerarBoletimGeral(event)">
+                            <span class="material-symbols-rounded">download</span> GERAR BOLETIM GERAL
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+window.openBoletimModal = function() {
+    injectBoletimModal();
+    document.getElementById('boletim-gerencial-modal').classList.add('active');
+    const sidebar = document.getElementById('main-sidebar');
+    if (sidebar && sidebar.classList.contains('active')) {
+        toggleSidebar();
+    }
+}
+
+window.closeBoletimModal = function(event) {
+    if (event && event.target.id !== 'boletim-gerencial-modal' && event.type === 'click') return;
+    const modal = document.getElementById('boletim-gerencial-modal');
+    if(modal) modal.classList.remove('active');
 }
 
 // ==============================================================================
