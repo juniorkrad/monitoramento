@@ -65,14 +65,18 @@ window.gerarBoletimPop = async function(event) {
             popEnergia += oltEnergia;
 
             let percOff = oltTotal > 0 ? (oltOffline / oltTotal) : 0;
-            let statusBadgeHtml = `<span class="status-badge" style="background: rgba(74,222,128,0.15); color: #4ade80;">NORMAL</span>`;
+            
+            // Estilização padrão base para as badges
+            const baseBadgeStyle = "padding: 6px 14px; border-radius: 99px; font-weight: bold; font-size: 0.85rem; display: inline-block; font-family: 'Montserrat', sans-serif;";
+            
+            let statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(74,222,128,0.15); color: #4ade80;">NORMAL</span>`;
             
             if (oltEnergia > 0 && oltEnergia >= (oltOffline * 0.5)) {
-                statusBadgeHtml = `<span class="status-badge" style="background: rgba(251,191,36,0.15); color: #fbbf24;">ENERGIA</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(251,191,36,0.15); color: #fbbf24;">ENERGIA</span>`;
             } else if (percOff >= 0.5 || oltOffline >= 32) {
-                statusBadgeHtml = `<span class="status-badge" style="background: rgba(248,113,113,0.15); color: #f87171;">CRÍTICO</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(248,113,113,0.15); color: #f87171;">CRÍTICO</span>`;
             } else if (oltOffline >= 16) {
-                statusBadgeHtml = `<span class="status-badge" style="background: rgba(251,191,36,0.15); color: #fbbf24;">ATENÇÃO</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(251,191,36,0.15); color: #fbbf24;">ATENÇÃO</span>`;
             }
 
             oltStatsList.push({
@@ -98,11 +102,11 @@ window.gerarBoletimPop = async function(event) {
             tableRowsHtml += `
                 <tr>
                     <td style="text-align: left; font-family: 'Montserrat', sans-serif; font-weight: bold;">${stat.id}</td>
-                    <td>${stat.total.toLocaleString('pt-BR')}</td>
-                    <td>${stat.online.toLocaleString('pt-BR')}</td>
-                    <td>${stat.offline.toLocaleString('pt-BR')}</td>
-                    <td>${stat.energia.toLocaleString('pt-BR')}</td>
-                    <td>${stat.statusHtml}</td>
+                    <td style="text-align: left;">${stat.total.toLocaleString('pt-BR')}</td>
+                    <td style="text-align: left;">${stat.online.toLocaleString('pt-BR')}</td>
+                    <td style="text-align: left;">${stat.offline.toLocaleString('pt-BR')}</td>
+                    <td style="text-align: left;">${stat.energia.toLocaleString('pt-BR')}</td>
+                    <td style="text-align: left;">${stat.statusHtml}</td>
                 </tr>
             `;
         });
@@ -110,11 +114,14 @@ window.gerarBoletimPop = async function(event) {
         wrapperDiv.innerHTML = `
             <div style="width: 1000px; background-color: #2f0e51; color: #ffffff; padding: 30px; border-radius: 24px; box-sizing: border-box; font-family: 'Montserrat', sans-serif;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 25px;">
-                    <div>
-                        <h2 style="margin: 0; font-size: 1.8rem; color: #fbbf24; display: flex; align-items: center; gap: 10px;">
-                            <span class="material-symbols-rounded" style="font-size: 32px;">domain</span> BOLETIM DE STATUS - POP
-                        </h2>
-                        <h3 style="margin: 5px 0 0 0; font-size: 1.3rem; text-transform: uppercase; color: #fff;">${popName}</h3>
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <img src="logo-relatorio.png" alt="Logo" style="height: 60px; object-fit: contain;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.8rem; color: #fbbf24; display: flex; align-items: center; gap: 10px;">
+                                <span class="material-symbols-rounded" style="font-size: 32px;">domain</span> BOLETIM DE STATUS - POP
+                            </h2>
+                            <h3 style="margin: 5px 0 0 0; font-size: 1.3rem; text-transform: uppercase; color: #fff;">${popName}</h3>
+                        </div>
                     </div>
                     <div style="text-align: right; color: #CAC4D0; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
                         Gerado em: ${dataHora}
@@ -125,17 +132,17 @@ window.gerarBoletimPop = async function(event) {
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; text-align: center;">
                         <div class="material-symbols-rounded" style="font-size: 32px; color: #ffffff; margin-bottom: 10px;">router</div>
                         <div style="font-family: 'Roboto Mono', monospace; font-size: 2rem; font-weight: 700; margin-bottom: 5px;">${popTotal.toLocaleString('pt-BR')}</div>
-                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Total Clientes</div>
+                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Total</div>
                     </div>
                     <div style="background: rgba(74, 222, 128, 0.05); border: 1px solid rgba(74, 222, 128, 0.2); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="material-symbols-rounded" style="font-size: 32px; color: #4ade80; margin-bottom: 10px;">check_circle</div>
+                        <div class="material-symbols-rounded" style="font-size: 32px; color: #4ade80; margin-bottom: 10px;">wifi</div>
                         <div style="font-family: 'Roboto Mono', monospace; font-size: 2rem; font-weight: 700; margin-bottom: 5px; color: #4ade80;">${popOnline.toLocaleString('pt-BR')}</div>
                         <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Online</div>
                     </div>
                     <div style="background: rgba(248, 113, 113, 0.05); border: 1px solid rgba(248, 113, 113, 0.2); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="material-symbols-rounded" style="font-size: 32px; color: #f87171; margin-bottom: 10px;">router_off</div>
+                        <div class="material-symbols-rounded" style="font-size: 32px; color: #f87171; margin-bottom: 10px;">wifi_off</div>
                         <div style="font-family: 'Roboto Mono', monospace; font-size: 2rem; font-weight: 700; margin-bottom: 5px; color: #f87171;">${popOffline.toLocaleString('pt-BR')}</div>
-                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Offline Total</div>
+                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Offline</div>
                     </div>
                     <div style="background: rgba(251, 191, 36, 0.05); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 20px; text-align: center;">
                         <div class="material-symbols-rounded" style="font-size: 32px; color: #fbbf24; margin-bottom: 10px;">power_off</div>
@@ -152,14 +159,14 @@ window.gerarBoletimPop = async function(event) {
                     <thead>
                         <tr>
                             <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left; border-radius: 8px 0 0 0;">OLT</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: center;">TOTAL</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #4ade80; text-align: center;">ONLINE</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #f87171; text-align: center;">OFFLINE</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: center;">ENERGIA</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: center; border-radius: 0 8px 0 0;">STATUS</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left;">TOTAL</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #4ade80; text-align: left;">ONLINE</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #f87171; text-align: left;">OFFLINE</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left;">ENERGIA</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left; border-radius: 0 8px 0 0;">STATUS</th>
                         </tr>
                     </thead>
-                    <tbody style="text-align: center; font-family: 'Roboto Mono', monospace;">
+                    <tbody style="font-family: 'Roboto Mono', monospace;">
                         ${tableRowsHtml}
                     </tbody>
                 </table>
@@ -168,7 +175,6 @@ window.gerarBoletimPop = async function(event) {
 
         document.body.appendChild(wrapperDiv);
 
-        // Estiliza as tds do wrapper para não conflitar com css global e manter o formato exato
         const tds = wrapperDiv.querySelectorAll('td');
         tds.forEach(td => {
             td.style.padding = '12px';
@@ -281,14 +287,18 @@ window.gerarBoletimGeral = async function(event) {
         let popStatsList = Object.keys(popStatsMap).map(pop => {
             let s = popStatsMap[pop];
             let percOff = s.total > 0 ? (s.offline / s.total) : 0;
-            let statusBadgeHtml = `<span class="status-badge" style="background: rgba(74,222,128,0.15); color: #4ade80;">ESTÁVEL</span>`;
+            
+            // Estilização padrão base para as badges
+            const baseBadgeStyle = "padding: 6px 14px; border-radius: 99px; font-weight: bold; font-size: 0.85rem; display: inline-block; font-family: 'Montserrat', sans-serif;";
+            
+            let statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(74,222,128,0.15); color: #4ade80;">ESTÁVEL</span>`;
             
             if (s.energia > 0 && s.energia >= (s.offline * 0.5) && s.energia >= 100) {
-                statusBadgeHtml = `<span class="status-badge" style="background: rgba(251,191,36,0.15); color: #fbbf24;">FALHA ELÉTRICA</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(251,191,36,0.15); color: #fbbf24;">FALHA ELÉTRICA</span>`;
             } else if (percOff >= 0.1 || s.offline >= 300) {
-                statusBadgeHtml = `<span class="status-badge" style="background: rgba(248,113,113,0.15); color: #f87171;">CRÍTICO</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(248,113,113,0.15); color: #f87171;">CRÍTICO</span>`;
             } else if (s.offline >= 100) {
-                statusBadgeHtml = `<span class="status-badge" style="background: rgba(251,191,36,0.15); color: #fbbf24;">ATENÇÃO</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(251,191,36,0.15); color: #fbbf24;">ATENÇÃO</span>`;
             }
 
             return {
@@ -315,11 +325,11 @@ window.gerarBoletimGeral = async function(event) {
             tableRowsHtml += `
                 <tr>
                     <td style="text-align: left; font-family: 'Montserrat', sans-serif; font-weight: bold;">${stat.id}</td>
-                    <td>${stat.total.toLocaleString('pt-BR')}</td>
-                    <td>${stat.online.toLocaleString('pt-BR')}</td>
-                    <td>${stat.offline.toLocaleString('pt-BR')}</td>
-                    <td>${stat.energia.toLocaleString('pt-BR')}</td>
-                    <td>${stat.statusHtml}</td>
+                    <td style="text-align: left;">${stat.total.toLocaleString('pt-BR')}</td>
+                    <td style="text-align: left;">${stat.online.toLocaleString('pt-BR')}</td>
+                    <td style="text-align: left;">${stat.offline.toLocaleString('pt-BR')}</td>
+                    <td style="text-align: left;">${stat.energia.toLocaleString('pt-BR')}</td>
+                    <td style="text-align: left;">${stat.statusHtml}</td>
                 </tr>
             `;
         });
@@ -327,11 +337,14 @@ window.gerarBoletimGeral = async function(event) {
         wrapperDiv.innerHTML = `
             <div style="width: 1000px; background-color: #2f0e51; color: #ffffff; padding: 30px; border-radius: 24px; box-sizing: border-box; font-family: 'Montserrat', sans-serif;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 25px;">
-                    <div>
-                        <h2 style="margin: 0; font-size: 1.8rem; color: #67079f; background: #fff; padding: 5px 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 10px;">
-                            <span class="material-symbols-rounded" style="font-size: 32px;">public</span> BOLETIM GERAL DA REDE
-                        </h2>
-                        <h3 style="margin: 10px 0 0 0; font-size: 1.3rem; text-transform: uppercase; color: #fff;">Visão Consolidada - Backbone e POPs</h3>
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <img src="logo-relatorio.png" alt="Logo" style="height: 60px; object-fit: contain;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span class="material-symbols-rounded" style="font-size: 36px; color: #ffffff;">public</span>
+                            <h2 style="margin: 0; font-size: 1.8rem; color: #67079f; background: #fff; padding: 5px 15px; border-radius: 8px;">
+                                BOLETIM GERAL DA REDE
+                            </h2>
+                        </div>
                     </div>
                     <div style="text-align: right; color: #CAC4D0; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
                         Gerado em: ${dataHora}
@@ -340,24 +353,24 @@ window.gerarBoletimGeral = async function(event) {
 
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px;">
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="material-symbols-rounded" style="font-size: 32px; color: #ffffff; margin-bottom: 10px;">language</div>
+                        <div class="material-symbols-rounded" style="font-size: 32px; color: #ffffff; margin-bottom: 10px;">router</div>
                         <div style="font-family: 'Roboto Mono', monospace; font-size: 2rem; font-weight: 700; margin-bottom: 5px;">${globalTotal.toLocaleString('pt-BR')}</div>
-                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Total Rede</div>
+                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Total</div>
                     </div>
                     <div style="background: rgba(74, 222, 128, 0.05); border: 1px solid rgba(74, 222, 128, 0.2); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="material-symbols-rounded" style="font-size: 32px; color: #4ade80; margin-bottom: 10px;">check_circle</div>
+                        <div class="material-symbols-rounded" style="font-size: 32px; color: #4ade80; margin-bottom: 10px;">wifi</div>
                         <div style="font-family: 'Roboto Mono', monospace; font-size: 2rem; font-weight: 700; margin-bottom: 5px; color: #4ade80;">${globalOnline.toLocaleString('pt-BR')}</div>
-                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Online Global</div>
+                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Online</div>
                     </div>
                     <div style="background: rgba(248, 113, 113, 0.05); border: 1px solid rgba(248, 113, 113, 0.2); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="material-symbols-rounded" style="font-size: 32px; color: #f87171; margin-bottom: 10px;">warning</div>
+                        <div class="material-symbols-rounded" style="font-size: 32px; color: #f87171; margin-bottom: 10px;">wifi_off</div>
                         <div style="font-family: 'Roboto Mono', monospace; font-size: 2rem; font-weight: 700; margin-bottom: 5px; color: #f87171;">${globalOffline.toLocaleString('pt-BR')}</div>
-                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Offline Global</div>
+                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Offline</div>
                     </div>
                     <div style="background: rgba(251, 191, 36, 0.05); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="material-symbols-rounded" style="font-size: 32px; color: #fbbf24; margin-bottom: 10px;">bolt</div>
+                        <div class="material-symbols-rounded" style="font-size: 32px; color: #fbbf24; margin-bottom: 10px;">power_off</div>
                         <div style="font-family: 'Roboto Mono', monospace; font-size: 2rem; font-weight: 700; margin-bottom: 5px; color: #fbbf24;">${globalEnergia.toLocaleString('pt-BR')}</div>
-                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Total Sem Energia</div>
+                        <div style="font-size: 0.85rem; color: #CAC4D0; text-transform: uppercase;">Sem Energia</div>
                     </div>
                 </div>
 
@@ -369,14 +382,14 @@ window.gerarBoletimGeral = async function(event) {
                     <thead>
                         <tr>
                             <th style="background: rgba(255,255,255,0.9); padding: 12px; color: #67079f; text-align: left; border-radius: 8px 0 0 0;">POP</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: center;">TOTAL</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #4ade80; text-align: center;">ONLINE</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #f87171; text-align: center;">OFFLINE</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: center;">ENERGIA</th>
-                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: center; border-radius: 0 8px 0 0;">STATUS MACRO</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: left;">TOTAL</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #4ade80; text-align: left;">ONLINE</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #f87171; text-align: left;">OFFLINE</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left;">ENERGIA</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: left; border-radius: 0 8px 0 0;">STATUS MACRO</th>
                         </tr>
                     </thead>
-                    <tbody style="text-align: center; font-family: 'Roboto Mono', monospace;">
+                    <tbody style="font-family: 'Roboto Mono', monospace;">
                         ${tableRowsHtml}
                     </tbody>
                 </table>
