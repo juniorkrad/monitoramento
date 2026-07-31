@@ -41,11 +41,9 @@
                     <span class="material-symbols-rounded">dns</span> Detalhes da OLT
                 </h3>
                 <div style="display: flex; gap: 15px; align-items: center;">
-                    <!-- Botão oculto temporariamente
-                    <button id="btn-gerar-boletim-energia" onclick="window.gerarRelatorioEnergiaOffscreen(event)" class="card-header-button" title="Gerar Boletim de Energia" style="display: none;">
-                        <span class="material-symbols-rounded">warning</span>
+                    <button id="btn-gerar-boletim-energia" onclick="window.gerarBoletimResumoEnergiaOltOffscreen(event)" class="card-header-button" title="Gerar Boletim de Energia da OLT" style="display: none;">
+                        <span class="material-symbols-rounded">assignment</span>
                     </button>
-                    -->
                     <button class="close-modal" onclick="closeSuperModal()">&times;</button>
                 </div>
             </div>
@@ -60,9 +58,14 @@
                         <button class="btn-voltar-placas" style="margin-bottom: 0;" onclick="backToEnergyPlacas()">
                             <span class="material-symbols-rounded">arrow_back</span> Voltar para Placas
                         </button>
-                        <button class="btn-voltar-placas" style="margin-bottom: 0; padding: 10px;" onclick="exportEnergiaPlacaToTXT()" title="Exportar para TXT">
-                            <span class="material-symbols-rounded">download</span>
-                        </button>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-gerar-boletim-energia-placa" class="btn-voltar-placas" style="margin-bottom: 0; padding: 10px;" onclick="window.gerarBoletimResumoEnergiaPlacaOffscreen(event)" title="Gerar Boletim de Energia da Placa">
+                                <span class="material-symbols-rounded">assignment</span>
+                            </button>
+                            <button class="btn-voltar-placas" style="margin-bottom: 0; padding: 10px;" onclick="exportEnergiaPlacaToTXT()" title="Exportar para TXT">
+                                <span class="material-symbols-rounded">download</span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="table-container">

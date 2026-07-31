@@ -107,14 +107,9 @@ button.status:hover { filter: brightness(1.2); }
 .status-atencao { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
 .status-problema { background: rgba(248, 113, 113, 0.15); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); }
 
+/* Alarme Crítico - Preto e Vermelho Escuro/Vibrante sem Pulsar */
 .status-critico {
-    background: #000000; color: #ff3333; border: 1px solid #ff3333;
-    animation: pulsoCritico 1.5s infinite;
-}
-@keyframes pulsoCritico {
-    0% { box-shadow: 0 0 0 0 rgba(255, 51, 51, 0.6); }
-    70% { box-shadow: 0 0 0 8px rgba(255, 51, 51, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 51, 51, 0); }
+    background: rgba(0, 0, 0, 0.6); color: #ff3333; border: 1px solid #ff3333;
 }
 
 /* ==========================================================================
@@ -387,15 +382,18 @@ button.status:hover { filter: brightness(1.2); }
 
 .placa-btn:hover { background: rgba(208, 188, 255, 0.08); border-color: var(--m3-primary); }
 
-.placa-btn.has-alarm { border: 2px solid #f87171; background: rgba(248, 113, 113, 0.05); }
-.placa-btn.has-warning { border: 2px solid var(--m3-color-warning); background: rgba(230, 162, 60, 0.05); }
+/* Novas Classes de Alarme para Placas */
+.placa-btn.has-alarm { border: 2px solid #f87171; background: rgba(248, 113, 113, 0.05); } /* Problema */
+.placa-btn.has-super-alarm { border: 2px solid #ff3333; background: rgba(0, 0, 0, 0.4); } /* Crítico */
+.placa-btn.has-warning { border: 2px solid var(--m3-color-warning); background: rgba(230, 162, 60, 0.05); } /* Atenção */
 
 .alarm-count {
     font-size: 0.75rem; font-weight: bold; padding: 4px 10px;
     border-radius: 12px; margin-top: 5px; font-family: var(--font-family-mono);
 }
-.alarm-count.critico { background: #f87171; color: #000; }
-.alarm-count.atencao { background: var(--m3-color-warning); color: #000; }
+.alarm-count.critico { background: #f87171; color: #000; } /* Problema (Vermelho padrão) */
+.alarm-count.super-critico { background: #ff3333; color: #fff; border: 1px solid #ff3333; } /* Crítico (Vermelho Escuro) */
+.alarm-count.atencao { background: var(--m3-color-warning); color: #000; } /* Atenção */
 
 .btn-voltar-placas {
     background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-on-surface);

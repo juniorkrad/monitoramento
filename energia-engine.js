@@ -495,10 +495,8 @@ window.openEnergySuperModal = function(id) {
     document.getElementById('energy-view-detalhes').style.display = 'none';
     document.getElementById('energy-view-placas').style.display = 'block';
     
-    /* Botão oculto temporariamente
     const btnBoletim = document.getElementById('btn-gerar-boletim-energia');
     if (btnBoletim) btnBoletim.style.display = 'inline-block';
-    */
 
     modal.style.display = 'flex';
     populateEnergyModal(id);
@@ -521,16 +519,32 @@ function populateEnergyModal(oltId) {
             const ports = pltData[placaNum] || {};
             
             let totalPowerOff = 0;
+            let hasCritico = false;
+            
             for (const pt in ports) {
-                totalPowerOff += ports[pt].powerOff;
+                const pData = ports[pt];
+                const pOff = pData.powerOff;
+                const calcTotal = pData.total || (pData.online + pData.offline);
+                
+                totalPowerOff += pOff;
+                
+                if (calcTotal > 0) {
+                    const perc = pOff / calcTotal;
+                    if ((perc >= 0.5 && pOff >= 10) || (perc === 1 && calcTotal >= 5)) {
+                        hasCritico = true;
+                    }
+                }
             }
 
             let btnClass = 'placa-btn';
             let badgeHtml = '';
             
-            if (totalPowerOff > 0) {
+            if (hasCritico) {
+                btnClass += ' has-super-alarm'; 
+                badgeHtml = `<span class="alarm-count super-critico">CRÍTICO</span>`;
+            } else if (totalPowerOff > 0) {
                 btnClass += ' has-warning'; 
-                badgeHtml = `<span class="alarm-count" style="background-color: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3);">${totalPowerOff} sem energia</span>`;
+                badgeHtml = `<span class="alarm-count atencao">${totalPowerOff} sem energia</span>`;
             }
 
             if (placasList) {
@@ -678,10 +692,8 @@ window.backToEnergyPlacas = function() {
     document.getElementById('energy-view-detalhes').style.display = 'none';
     document.getElementById('energy-view-placas').style.display = 'block';
 
-    /* Botão oculto temporariamente
     const btnBoletim = document.getElementById('btn-gerar-boletim-energia');
     if (btnBoletim) btnBoletim.style.display = 'inline-block';
-    */
 };
 
 document.addEventListener('DOMContentLoaded', () => {

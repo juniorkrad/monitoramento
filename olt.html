@@ -38,17 +38,9 @@
                     <span class="material-symbols-rounded">dns</span> Detalhes da OLT
                 </h3>
                 <div style="display: flex; gap: 15px; align-items: center;">
-                    <!-- Botões ocultos temporariamente 
-                    <button id="btn-gerar-boletim" onclick="window.gerarRelatorioOltOffscreen(event)" class="card-header-button" title="Gerar Boletim de Alarmes" style="display: none;">
-                        <span class="material-symbols-rounded">warning</span>
+                    <button id="btn-gerar-boletim" onclick="window.gerarBoletimResumoOltOffscreen(event)" class="card-header-button" title="Gerar Boletim da OLT" style="display: none;">
+                        <span class="material-symbols-rounded">assignment</span>
                     </button>
-                    <button id="btn-gerar-comunicado" onclick="window.gerarComunicadoSocialOffscreen(event)" class="card-header-button" title="Gerar Comunicado Redes Sociais" style="display: none;">
-                        <span class="material-symbols-rounded">campaign</span>
-                    </button>
-                    <button id="btn-export-geral-txt" onclick="window.gerarRelatorioTxtOffscreen(event)" class="card-header-button" title="Exportar Relatório TXT" style="display: none;">
-                        <span class="material-symbols-rounded">description</span>
-                    </button>
-                    -->
                     <button class="close-modal" onclick="closeSuperModal()">&times;</button>
                 </div>
             </div>
@@ -63,9 +55,14 @@
                         <button class="btn-voltar-placas" style="margin-bottom: 0;" onclick="backToOltPlacas()">
                             <span class="material-symbols-rounded">arrow_back</span> Voltar para Placas
                         </button>
-                        <button id="btn-export-placa-txt" class="btn-voltar-placas" style="margin-bottom: 0; padding: 10px;" onclick="window.exportPlacaToTXT()" title="Exportar Tabela para TXT">
-                            <span class="material-symbols-rounded">download</span>
-                        </button>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-gerar-boletim-placa" class="btn-voltar-placas" style="margin-bottom: 0; padding: 10px;" onclick="window.gerarBoletimResumoPlacaOffscreen(event)" title="Gerar Boletim da Placa">
+                                <span class="material-symbols-rounded">assignment</span>
+                            </button>
+                            <button id="btn-export-placa-txt" class="btn-voltar-placas" style="margin-bottom: 0; padding: 10px;" onclick="window.exportPlacaToTXT()" title="Exportar Tabela para TXT">
+                                <span class="material-symbols-rounded">download</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table class="noc-table">

@@ -1,5 +1,6 @@
 // ==============================================================================
 // boletim-gerencial.js - Gerador de Boletins em Formato Dashboard (PNG)
+// Atualização: Refinamento das Regras Macro para o Boletim Geral da Rede
 // ==============================================================================
 
 window.gerarBoletimPop = async function(event) {
@@ -35,6 +36,8 @@ window.gerarBoletimPop = async function(event) {
             if (!oltConfig) return;
 
             let oltTotal = 0, oltOnline = 0, oltOffline = 0, oltEnergia = 0;
+            let countCritico = 0, countProblema = 0, countAtencao = 0;
+            const portDataMap = {};
 
             if (window.DATA_STORE && window.DATA_STORE.olts && window.DATA_STORE.olts[oltId]) {
                 const rows = window.DATA_STORE.olts[oltId].slice(1);
@@ -42,8 +45,27 @@ window.gerarBoletimPop = async function(event) {
                     if (col.length === 0) return;
                     const isOnline = DataMapper.isOnline(col[oltConfig.type === 'nokia' ? 4 : 2], oltConfig.type);
                     if (isOnline) oltOnline++; else oltOffline++;
+                    
+                    const portInfo = DataMapper.extractPort(col[0], oltConfig.type);
+                    if (portInfo) {
+                        const portKey = `${portInfo.placa}/${portInfo.porta}`;
+                        if (!portDataMap[portKey]) portDataMap[portKey] = { online: 0, offline: 0 };
+                        if (isOnline) portDataMap[portKey].online++;
+                        else portDataMap[portKey].offline++;
+                    }
                 });
                 oltTotal = oltOnline + oltOffline;
+            }
+
+            for (const pk in portDataMap) {
+                const p = portDataMap[pk];
+                const pTotal = p.online + p.offline;
+                if (pTotal >= 5) {
+                    const percOffline = p.offline / pTotal;
+                    if (percOffline === 1) countCritico++;
+                    else if (percOffline >= 0.5 || p.offline >= 32) countProblema++;
+                    else if (p.offline >= 16) countAtencao++;
+                }
             }
 
             if (window.DATA_STORE && window.DATA_STORE.energia && oltConfig.energyCol !== undefined) {
@@ -64,19 +86,23 @@ window.gerarBoletimPop = async function(event) {
             popOffline += oltOffline;
             popEnergia += oltEnergia;
 
-            let percOff = oltTotal > 0 ? (oltOffline / oltTotal) : 0;
-            
-            // Estilização padrão base para as badges
+            let isCritico = (countCritico >= 1 || countProblema >= 4);
+            let isProblema = ((countProblema >= 1 && countProblema <= 3) || countAtencao >= 4) && !isCritico;
+            let isAtencao = (countAtencao >= 1 && countAtencao <= 3) && !isCritico && !isProblema;
+
             const baseBadgeStyle = "padding: 6px 14px; border-radius: 99px; font-weight: bold; font-size: 0.85rem; display: inline-block; font-family: 'Montserrat', sans-serif;";
-            
             let statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(74,222,128,0.15); color: #4ade80;">NORMAL</span>`;
             
             if (oltEnergia > 0 && oltEnergia >= (oltOffline * 0.5)) {
                 statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(251,191,36,0.15); color: #fbbf24;">ENERGIA</span>`;
-            } else if (percOff >= 0.5 || oltOffline >= 32) {
-                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(248,113,113,0.15); color: #f87171;">CRÍTICO</span>`;
-            } else if (oltOffline >= 16) {
+            } else if (isCritico) {
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(0,0,0,0.6); color: #ff3333; border: 1px solid #ff3333;">CRÍTICO</span>`;
+            } else if (isProblema) {
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(248,113,113,0.15); color: #f87171;">PROBLEMA</span>`;
+            } else if (isAtencao) {
                 statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(251,191,36,0.15); color: #fbbf24;">ATENÇÃO</span>`;
+            } else if (oltTotal === 0) {
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(255,255,255,0.1); color: #CAC4D0;">SEM CLIENTES</span>`;
             }
 
             oltStatsList.push({
@@ -240,15 +266,24 @@ window.gerarBoletimGeral = async function(event) {
 
         const uniquePops = [...new Set(Object.values(POP_MAP))].sort();
         uniquePops.forEach(pop => {
-            popStatsMap[pop] = { total: 0, online: 0, offline: 0, energia: 0 };
+            popStatsMap[pop] = { 
+                total: 0, online: 0, offline: 0, energia: 0, 
+                totalPortasCriticas: 0, oltsCom5Problemas: 0, oltsCom3Problemas: 0 
+            };
         });
 
         GLOBAL_MASTER_OLT_LIST.forEach(oltConfig => {
             const oltId = oltConfig.id;
             const popName = POP_MAP[oltId] || 'Outros';
-            if (!popStatsMap[popName]) popStatsMap[popName] = { total: 0, online: 0, offline: 0, energia: 0 };
+            if (!popStatsMap[popName]) popStatsMap[popName] = { 
+                total: 0, online: 0, offline: 0, energia: 0, 
+                totalPortasCriticas: 0, oltsCom5Problemas: 0, oltsCom3Problemas: 0 
+            };
 
             let oltTotal = 0, oltOnline = 0, oltOffline = 0, oltEnergia = 0;
+            const portDataMap = {};
+            let oltPortasCriticas = 0;
+            let oltPortasProblema = 0;
 
             if (window.DATA_STORE && window.DATA_STORE.olts && window.DATA_STORE.olts[oltId]) {
                 const rows = window.DATA_STORE.olts[oltId].slice(1);
@@ -256,8 +291,29 @@ window.gerarBoletimGeral = async function(event) {
                     if (col.length === 0) return;
                     const isOnline = DataMapper.isOnline(col[oltConfig.type === 'nokia' ? 4 : 2], oltConfig.type);
                     if (isOnline) oltOnline++; else oltOffline++;
+                    
+                    const portInfo = DataMapper.extractPort(col[0], oltConfig.type);
+                    if (portInfo) {
+                        const portKey = `${portInfo.placa}/${portInfo.porta}`;
+                        if (!portDataMap[portKey]) portDataMap[portKey] = { online: 0, offline: 0 };
+                        if (isOnline) portDataMap[portKey].online++;
+                        else portDataMap[portKey].offline++;
+                    }
                 });
                 oltTotal = oltOnline + oltOffline;
+            }
+
+            for (const pk in portDataMap) {
+                const p = portDataMap[pk];
+                const pTotal = p.online + p.offline;
+                if (pTotal >= 5) {
+                    const percOffline = p.offline / pTotal;
+                    if (percOffline === 1) {
+                        oltPortasCriticas++;
+                    } else if (percOffline >= 0.5 || p.offline >= 32) {
+                        oltPortasProblema++;
+                    }
+                }
             }
 
             if (window.DATA_STORE && window.DATA_STORE.energia && oltConfig.energyCol !== undefined) {
@@ -278,6 +334,10 @@ window.gerarBoletimGeral = async function(event) {
             popStatsMap[popName].offline += oltOffline;
             popStatsMap[popName].energia += oltEnergia;
 
+            popStatsMap[popName].totalPortasCriticas += oltPortasCriticas;
+            if (oltPortasProblema >= 5) popStatsMap[popName].oltsCom5Problemas++;
+            if (oltPortasProblema >= 3) popStatsMap[popName].oltsCom3Problemas++;
+
             globalTotal += oltTotal;
             globalOnline += oltOnline;
             globalOffline += oltOffline;
@@ -286,18 +346,23 @@ window.gerarBoletimGeral = async function(event) {
 
         let popStatsList = Object.keys(popStatsMap).map(pop => {
             let s = popStatsMap[pop];
-            let percOff = s.total > 0 ? (s.offline / s.total) : 0;
             
-            // Estilização padrão base para as badges
+            let isFalhaEletrica = s.energia > 0 && s.energia >= (s.offline * 0.5);
+            let isCritico = s.totalPortasCriticas >= 3;
+            let isProblema = s.totalPortasCriticas >= 1 && s.totalPortasCriticas <= 2;
+            let isAtencao = s.oltsCom5Problemas >= 1 || s.oltsCom3Problemas >= 2;
+
             const baseBadgeStyle = "padding: 6px 14px; border-radius: 99px; font-weight: bold; font-size: 0.85rem; display: inline-block; font-family: 'Montserrat', sans-serif;";
             
             let statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(74,222,128,0.15); color: #4ade80;">ESTÁVEL</span>`;
             
-            if (s.energia > 0 && s.energia >= (s.offline * 0.5) && s.energia >= 100) {
+            if (isFalhaEletrica) {
                 statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(251,191,36,0.15); color: #fbbf24;">FALHA ELÉTRICA</span>`;
-            } else if (percOff >= 0.1 || s.offline >= 300) {
-                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(248,113,113,0.15); color: #f87171;">CRÍTICO</span>`;
-            } else if (s.offline >= 100) {
+            } else if (isCritico) {
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(0,0,0,0.6); color: #ff3333; border: 1px solid #ff3333;">CRÍTICO</span>`;
+            } else if (isProblema) {
+                statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(248,113,113,0.15); color: #f87171;">PROBLEMA</span>`;
+            } else if (isAtencao) {
                 statusBadgeHtml = `<span class="status-badge" style="${baseBadgeStyle} background: rgba(251,191,36,0.15); color: #fbbf24;">ATENÇÃO</span>`;
             }
 

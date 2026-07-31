@@ -509,9 +509,9 @@ window.startOltMonitoring = function(config) {
                 const placaNum = i;
                 const ports = window.CURRENT_OLT_PORT_DATA[placaNum] || {};
                 
-                let hasCritical = false;
-                let hasWarning = false;
-                let alarmCount = 0;
+                let countCritico = 0;
+                let countProblema = 0;
+                let countAtencao = 0;
 
                 for (const pt in ports) {
                     const p = ports[pt];
@@ -519,23 +519,32 @@ window.startOltMonitoring = function(config) {
                     const percOffline = total > 0 ? (p.offline / total) : 0;
                     
                     if (total >= 5) {
-                        if (percOffline === 1 || percOffline >= 0.5 || p.offline >= 32) {
-                            hasCritical = true;
-                            alarmCount++;
+                        if (percOffline === 1) {
+                            countCritico++;
+                        } else if (percOffline >= 0.5 || p.offline >= 32) {
+                            countProblema++;
                         } else if (p.offline >= 16) {
-                            hasWarning = true;
+                            countAtencao++;
                         }
                     }
                 }
 
+                let isCritico = (countCritico >= 1 || countProblema >= 4);
+                let isProblema = ((countProblema >= 1 && countProblema <= 3) || countAtencao >= 4) && !isCritico;
+                let isAtencao = (countAtencao >= 1 && countAtencao <= 3) && !isCritico && !isProblema;
+
                 let btnClass = 'placa-btn';
                 let badgeHtml = '';
-                if (hasCritical) {
+
+                if (isCritico) {
+                    btnClass += ' has-super-alarm';
+                    badgeHtml = `<span class="alarm-count super-critico">CRÍTICO</span>`;
+                } else if (isProblema) {
                     btnClass += ' has-alarm';
-                    badgeHtml = `<span class="alarm-count critico">${alarmCount} crítico(s)</span>`;
-                } else if (hasWarning) {
+                    badgeHtml = `<span class="alarm-count critico">PROBLEMA</span>`;
+                } else if (isAtencao) {
                     btnClass += ' has-warning';
-                    badgeHtml = `<span class="alarm-count atencao">Atenção</span>`;
+                    badgeHtml = `<span class="alarm-count atencao">ATENÇÃO</span>`;
                 }
 
                 if (placasList) {
@@ -575,12 +584,7 @@ window.openOltPlacaDetails = function(placa, oltType) {
     }
 
     const btnBoletim = document.getElementById('btn-gerar-boletim');
-    const btnComunicado = document.getElementById('btn-gerar-comunicado');
-    const btnExportTxt = document.getElementById('btn-export-geral-txt');
-    
     if (btnBoletim) btnBoletim.style.display = 'none';
-    if (btnComunicado) btnComunicado.style.display = 'none';
-    if (btnExportTxt) btnExportTxt.style.display = 'none';
     
     const tbody = document.getElementById('olt-detalhes-tbody');
     tbody.innerHTML = '';
@@ -646,12 +650,7 @@ window.backToOltPlacas = function() {
     }
 
     const btnBoletim = document.getElementById('btn-gerar-boletim');
-    const btnComunicado = document.getElementById('btn-gerar-comunicado');
-    const btnExportTxt = document.getElementById('btn-export-geral-txt');
-    
     if (btnBoletim) btnBoletim.style.display = 'inline-block';
-    if (btnComunicado) btnComunicado.style.display = 'inline-block';
-    if (btnExportTxt) btnExportTxt.style.display = 'inline-block';
 };
 
 window.exportPlacaToTXT = function() {
