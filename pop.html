@@ -67,6 +67,9 @@
 
     <div id="footer-placeholder"></div>
 
+    <!-- Container Offscreen para PDF do Relatório Híbrido -->
+    <div id="hibrido-offscreen-container" style="position: absolute; top: -9999px; left: -9999px; width: 210mm; background-color: #ffffff; color: var(--m3-primary);"></div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Core do Sistema -->
     <script src="config.js"></script>
@@ -91,6 +94,9 @@
     <script src="temperatura-engine.js"></script>
     <script src="pop-engine.js"></script>
     <script src="boletim-gerencial.js"></script>
+    
+    <!-- Novo Script para Relatório Híbrido -->
+    <script src="relatorio-hibrido.js"></script> 
     
     <script>
         if ('serviceWorker' in navigator) {

@@ -1,6 +1,6 @@
 // ==============================================================================
 // olt-relatorio.js - Gerador de Boletim Visual (PNG Off-screen) e TXT para OLTs
-// Atualização: Escopo Unificado por POP e Recebimento Dinâmico de Parâmetros
+// Atualização: Escopo Unificado por POP, Resumo Placa, OLT e Boletim de Emergência (Altura Fixa)
 // ==============================================================================
 
 window.gerarRelatorioOltOffscreen = async function(event, directPopName) {
@@ -733,6 +733,151 @@ window.gerarBoletimResumoPlacaOffscreen = async function(event) {
     } catch (error) {
         console.error('Erro ao gerar boletim da Placa:', error);
         alert('Ocorreu um erro ao gerar o boletim da Placa.');
+    } finally {
+        if (btn) {
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        }
+    }
+};
+
+window.gerarBoletimEmergenciaOltOffscreen = async function(event) {
+    if (event) event.stopPropagation();
+    
+    if (!window.CURRENT_MONITORING_CONFIG) {
+        alert("Nenhuma OLT selecionada.");
+        return;
+    }
+    
+    const oltConfig = window.CURRENT_MONITORING_CONFIG;
+    const oltName = oltConfig.oltName || oltConfig.id;
+    
+    const btn = event ? event.currentTarget : null;
+    let originalContent = '';
+    if (btn) {
+        originalContent = btn.innerHTML;
+        btn.innerHTML = `<span class="material-symbols-rounded">hourglass_empty</span>`;
+        btn.disabled = true;
+    }
+
+    try {
+        let globalTotal = 0, globalOnline = 0, globalOffline = 0;
+        let portasCriticas = [];
+
+        for (let i = 1; i <= oltConfig.boards; i++) {
+            const ports = window.CURRENT_OLT_PORT_DATA[i] || {};
+            for (const pt in ports) {
+                const pData = ports[pt];
+                const total = pData.online + pData.offline;
+                
+                globalTotal += total;
+                globalOnline += pData.online;
+                globalOffline += pData.offline;
+                
+                if (total >= 5 && pData.offline === total) {
+                    portasCriticas.push({
+                        placa: i,
+                        porta: pt,
+                        circuito: pData.info,
+                        bairro: pData.bairro && pData.bairro !== '-' ? pData.bairro : 'N/A',
+                        total: total,
+                        offline: pData.offline
+                    });
+                }
+            }
+        }
+
+        const dataHora = new Date().toLocaleString('pt-BR');
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.id = `offscreen-boletim-emergencia`;
+        wrapperDiv.style.position = 'absolute';
+        wrapperDiv.style.left = '-9999px';
+        wrapperDiv.style.top = '0';
+        wrapperDiv.style.backgroundColor = 'transparent';
+
+        let conteudoHtml = '';
+
+        if (portasCriticas.length === 0) {
+            conteudoHtml = `
+                <div style="text-align: center; padding: 60px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 25px;">
+                    <span class="material-symbols-rounded" style="font-size: 64px; color: #4ade80; margin-bottom: 15px; display:block;">check_circle</span>
+                    <h2 style="margin: 0; color: #4ade80; font-size: 2rem;">OLT Estável</h2>
+                    <p style="color: #CAC4D0; margin-top: 10px; font-size: 1.1rem;">Nenhuma porta em estado crítico (100% offline) detectada nesta OLT.</p>
+                </div>
+            `;
+        } else {
+            let tableRowsHtml = '';
+            portasCriticas.forEach(p => {
+                tableRowsHtml += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <td style="padding: 12px; font-family: 'Roboto Mono', monospace; text-align: left;">${p.placa}/${String(p.porta).padStart(2, '0')}</td>
+                        <td style="padding: 12px; text-align: left;">
+                            <span style="border: 1px solid rgba(255,255,255,0.2); background-color: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 8px; font-family: 'Roboto Mono', monospace; font-size: 0.9rem;">${p.circuito}</span>
+                        </td>
+                        <td style="padding: 12px; text-align: left; color: #CAC4D0; font-size: 0.85rem;">${p.bairro}</td>
+                        <td style="padding: 12px; text-align: left; font-family: 'Roboto Mono', monospace; font-weight: bold; color: #ff3333;">100%</td>
+                        <td style="padding: 12px; text-align: left;">
+                            <span style="padding: 6px 12px; border-radius: 12px; font-weight: bold; font-size: 0.85rem; background: rgba(0,0,0,0.6); color: #ff3333; border: 1px solid #ff3333;">CRÍTICO</span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            conteudoHtml = `
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                    <thead>
+                        <tr>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left; border-radius: 8px 0 0 0;">PLACA/PORTA</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: left;">CIRCUITO</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: left;">BAIRRO</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ff3333; text-align: left;">IMPACTO</th>
+                            <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left; border-radius: 0 8px 0 0;">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-family: 'Montserrat', sans-serif;">
+                        ${tableRowsHtml}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        wrapperDiv.innerHTML = `
+            <div style="width: 1000px; min-height: 850px; background-color: #2f0e51; color: #ffffff; padding: 30px; border-radius: 24px; box-sizing: border-box; font-family: 'Montserrat', sans-serif;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 25px;">
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <img src="logo-relatorio.png" alt="Logo" style="height: 60px; object-fit: contain;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.8rem; color: #ff3333; display: flex; align-items: center; gap: 10px;">
+                                <span class="material-symbols-rounded" style="font-size: 32px;">warning</span> BOLETIM DE EMERGÊNCIA
+                            </h2>
+                            <h3 style="margin: 5px 0 0 0; font-size: 1.3rem; text-transform: uppercase; color: #fff;">${oltName}</h3>
+                        </div>
+                    </div>
+                    <div style="text-align: right; color: #CAC4D0; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+                        Gerado em: ${dataHora}
+                    </div>
+                </div>
+
+                ${conteudoHtml}
+            </div>
+        `;
+
+        document.body.appendChild(wrapperDiv);
+
+        await new Promise(r => setTimeout(r, 500)); 
+
+        const canvas = await html2canvas(wrapperDiv, { backgroundColor: null, scale: 2, logging: false });
+        
+        const link = document.createElement('a');
+        link.download = `Boletim_Emergencia_${oltName}_${new Date().getTime()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        document.body.removeChild(wrapperDiv);
+
+    } catch (error) {
+        console.error('Erro ao gerar boletim de emergência:', error);
+        alert('Ocorreu um erro ao gerar o boletim de emergência.');
     } finally {
         if (btn) {
             btn.innerHTML = originalContent;

@@ -38,9 +38,17 @@
                     <span class="material-symbols-rounded">dns</span> Detalhes da OLT
                 </h3>
                 <div style="display: flex; gap: 15px; align-items: center;">
-                    <button id="btn-gerar-boletim" onclick="window.gerarBoletimResumoOltOffscreen(event)" class="card-header-button" title="Gerar Boletim da OLT" style="display: none;">
-                        <span class="material-symbols-rounded">assignment</span>
-                    </button>
+                    <!-- Wrapper para proteger o display: flex da manipulação do JS -->
+                    <div id="btn-gerar-boletim" style="display: none;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button onclick="window.gerarBoletimEmergenciaOltOffscreen(event)" class="card-header-button" title="Gerar Boletim de Emergência (Portas Críticas)" style="color: #ff3333; border: 1px solid rgba(255, 51, 51, 0.3); background: rgba(255, 51, 51, 0.1);">
+                                <span class="material-symbols-rounded">warning</span>
+                            </button>
+                            <button onclick="window.gerarBoletimResumoOltOffscreen(event)" class="card-header-button" title="Gerar Boletim da OLT">
+                                <span class="material-symbols-rounded">assignment</span>
+                            </button>
+                        </div>
+                    </div>
                     <button class="close-modal" onclick="closeSuperModal()">&times;</button>
                 </div>
             </div>
