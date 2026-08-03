@@ -1,6 +1,6 @@
 // ==============================================================================
 // olt-engine.js - Motor Dedicado de Monitoramento de Rede (Individual e Global)
-// Atualização: Injeção de Dados (Serial, Código, Potência) e Limpeza de dBm
+// Atualização: Injeção de Detalhes de Circuito e Portas no Alarme de Backbone
 // ==============================================================================
 
 window.OLT_CLIENTS_DATA = {};
@@ -229,7 +229,11 @@ function runGlobalNetworkOverview() {
         }
         
         if (ports100Down >= 2) { 
-            currentBackbones.add(`[${result.id}] BACKBONE::${result.offlineCount}`); 
+            const detailsStr = superPorts.map(sp => {
+                const circuitoNome = DataMapper.getCircuitInfo(rowsCircuitos, pseudoConfig, sp.placa, sp.porta);
+                return `${sp.key}::${circuitoNome}`;
+            }).join('||');
+            currentBackbones.add(`[${result.id}] BACKBONE::${result.offlineCount}::${detailsStr}`); 
         } else if (ports100Down === 1) {
             const sp = superPorts[0];
             const circuitoNome = DataMapper.getCircuitInfo(rowsCircuitos, pseudoConfig, sp.placa, sp.porta);
@@ -472,12 +476,10 @@ window.startOltMonitoring = function(config) {
                 let serialVal = '';
                 let codigoVal = '';
                 
-                // LIMPEZA DA POTÊNCIA: Remove "dBm" (qualquer case) e remove todos os espaços para isolar apenas o número
                 let potenciaVal = String(columns[5] || '').replace(/dbm/ig, '').replace(/\s+/g, '');
                 
                 let statusRefVal = '';
                 
-                // Mapeamento exclusivo: Nokia e Furukawa
                 if (config.type === 'nokia') {
                     serialVal = columns[2] || '';
                     codigoVal = columns[8] || '';
