@@ -1,6 +1,6 @@
 // ==============================================================================
 // layout.js - Construtor de Layout e Menu Inteligente (Com Busca e Emergência Autenticada)
-// Atualização: Injeção dos Modais de Relatório PDF e Boletim Gerencial
+// Atualização: Injeção dos Modais de Relatório PDF e Boletim Gerencial + Dashboard 360
 // ==============================================================================
 
 (function loadIconFont() {
@@ -77,6 +77,11 @@ function loadSidebar(currentPage) {
                 <a href="index.html" class="sidebar-link home-highlight" style="justify-content: flex-start; text-align: left; padding-left: 20px;">
                     <span class="material-symbols-rounded" style="font-size: 28px; margin-right: 12px;">home</span>
                     HOME
+                </a>
+
+                <a href="dashboard360.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
+                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">dashboard</span>
+                    DASHBOARD 360
                 </a>
 
                 <a href="pop.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">

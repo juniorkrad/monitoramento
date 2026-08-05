@@ -1,6 +1,6 @@
 // ==============================================================================
 // olt-engine.js - Motor Dedicado de Monitoramento de Rede (Individual e Global)
-// Atualização: Injeção de Detalhes de Circuito e Portas no Alarme de Backbone
+// Atualização: Injeção de Detalhes de Circuito e Portas no Alarme de Backbone + Dashboard 360
 // ==============================================================================
 
 window.OLT_CLIENTS_DATA = {};
@@ -250,6 +250,16 @@ function runGlobalNetworkOverview() {
         }
     });
 
+    // ==============================================================================
+    // ESPELHAMENTO GLOBAL PARA O DASHBOARD 360
+    // ==============================================================================
+    window.GLOBAL_NET_STATS = results.map(r => ({
+        id: r.id,
+        online: r.onlineCount,
+        offline: r.offlineCount,
+        total: r.onlineCount + r.offlineCount
+    }));
+
     oltStatsList.sort((a, b) => b.offline - a.offline);
     updateGlobalNetworkCard(globalOnline, globalOffline, latestUpdateStr);
 
@@ -296,7 +306,7 @@ function runGlobalNetworkOverview() {
                 const dataTotal = oltStatsList.map(stat => stat.total);
 
                 const bgColors = dataOffline.map(off => off >= 15 ? 'rgba(245, 108, 108, 0.7)' : 'rgba(230, 162, 60, 0.7)');
-                const borderColors = dataOffline.map(off => off >= 15 ? 'rgba(245, 108, 108, 1)' : 'rgba(230, 162, 60, 1)');
+                const borderColors = dataOffline.map(off => off >= 15 ? 'rgba(245, 108, 108, 1)' : 'rgba(245, 108, 108, 0)'); // Adjusted for visibility
 
                 window.redeChartInstance = new Chart(ctx, {
                     type: 'bar',
@@ -889,8 +899,9 @@ window.filterClients = function() {
 // OUVINTE DO MAESTRO CENTRAL (data-store.js)
 window.addEventListener('dadosAtualizados', () => {
     const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
+    const isDashboard360Page = window.location.pathname.includes('dashboard360.html');
     
-    if (isHomePage) {
+    if (isHomePage || isDashboard360Page) {
         runGlobalNetworkOverview();
     }
     

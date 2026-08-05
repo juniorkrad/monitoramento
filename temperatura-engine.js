@@ -1,6 +1,6 @@
 // ==============================================================================
 // temperatura-engine.js - Motor Dedicado para Análise Térmica das OLTs
-// Atualização: Wallboard da Home - Substituição do Resumo Global por Heatmaps e suporte à página de POPs
+// Atualização: Wallboard da Home - Substituição do Resumo Global por Heatmaps e suporte à página de POPs + Dashboard 360
 // ==============================================================================
 
 const TAB_TEMPERATURA = 'TEMPERATURA'; 
@@ -169,9 +169,10 @@ function runTemperaturaEngine() {
     const gridEl = document.getElementById('temperatura-grid');
     const isTemperaturaPage = window.location.pathname.includes('temperatura.html');
     const isPopPage = window.location.pathname.includes('pop.html');
+    const isDashboard360Page = window.location.pathname.includes('dashboard360.html');
     const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
 
-    if (!isTemperaturaPage && !isHomePage && !isPopPage) return;
+    if (!isTemperaturaPage && !isHomePage && !isPopPage && !isDashboard360Page) return;
 
     try {
         let oltStats = [];
@@ -257,6 +258,9 @@ function runTemperaturaEngine() {
             globalCriticos += criticos;
             globalAtencao += atencao;
         });
+
+        // ESPELHANDO PARA O DASHBOARD 360
+        window.GLOBAL_TEMP_STATS = oltStats;
 
         // ==============================================================================
         // INJEÇÃO DA HOME (Mini Cards Wallboard com Heatmap Sparkline)

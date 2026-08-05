@@ -1,6 +1,6 @@
 // ==============================================================================
 // energia-engine.js - Motor Dedicado de Monitorização de Energia (Dying Gasp)
-// Atualização: Wallboard da Home - Resumo Médio + Gráfico de Barras MD3 e suporte à página de POPs
+// Atualização: Wallboard da Home - Resumo Médio + Gráfico de Barras MD3 e suporte à página de POPs + Dashboard 360
 // ==============================================================================
 
 window.ENERGY_DATA_STORE = {};
@@ -182,9 +182,10 @@ function runEnergyMonitoring() {
     const gridEnergyPage = document.getElementById('energy-olt-grid');
     const isEnergyPage = window.location.pathname.includes('energia.html');
     const isPopPage = window.location.pathname.includes('pop.html');
+    const isDashboard360Page = window.location.pathname.includes('dashboard360.html');
     const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
 
-    if (!isEnergyPage && !isHomePage && !isPopPage) return;
+    if (!isEnergyPage && !isHomePage && !isPopPage && !isDashboard360Page) return;
 
     try {
         let globalPowerOff = 0;

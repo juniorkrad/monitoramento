@@ -1,6 +1,6 @@
 // ==============================================================================
 // potencia-engine.js - Motor Dedicado para Análise de Potência Óptica
-// Atualização: Wallboard da Home - Substituição do Resumo Global por Gauges
+// Atualização: Wallboard da Home - Substituição do Resumo Global por Gauges + Dashboard 360
 // ==============================================================================
 
 window.POTENCIA_CLIENTS_DATA = {};
@@ -166,9 +166,10 @@ function runPotenciaEngine() {
 
     const gridEl = document.getElementById('potencia-grid');
     const isPotenciaPage = window.location.pathname.includes('potencia.html');
+    const isDashboard360Page = window.location.pathname.includes('dashboard360.html');
     const isHomePage = typeof checkIsHomePage === 'function' ? checkIsHomePage() : (window.location.pathname.includes('index.html') || window.location.pathname === '/' || !window.location.pathname.endsWith('.html'));
 
-    if (!isPotenciaPage && !isHomePage) return;
+    if (!isPotenciaPage && !isHomePage && !isDashboard360Page) return;
 
     try {
         let globalCriticos = 0;
@@ -253,6 +254,9 @@ function runPotenciaEngine() {
             globalAnalisados += analisados;
             globalDbmSums += dbmSums;
         });
+
+        // ESPELHANDO PARA O DASHBOARD 360
+        window.GLOBAL_POTENCIA_STATS = oltStats;
 
         // ==============================================================================
         // INJEÇÃO DA HOME (Wallboard Widescreen com Mini Gauges em cada card)
