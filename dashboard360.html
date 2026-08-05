@@ -6,30 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard 360 - NOC</title>
     
-    <!-- Ícones e Fontes -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    
-    <!-- CSS Global do Sistema -->
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="layout.css">
-    
-    <!-- CSS Exclusivo desta página -->
     <link rel="stylesheet" href="dashboard360.css">
 </head>
 <body>
 
     <div class="page-container">
-        <!-- Menu e Cabeçalho Padrão do Sistema -->
         <div id="header-placeholder"></div>
 
         <main class="main-content" style="flex-direction: column;">
-            
-            <!-- Container onde os cards reais serão injetados pelo Engine -->
             <div class="grid-container" id="dashboard-container">
-                <!-- Loading inicial enquanto a API busca os dados -->
                 <div style="grid-column: 1/-1; text-align: center; color: var(--m3-on-surface-variant); padding: 40px 0;">
                     <span class="material-symbols-rounded" style="font-size: 48px; display: block; margin-bottom: 10px; animation: textFlash 1.5s infinite;">sync</span>
                     <h2>Sincronizando dados da rede...</h2>
@@ -38,9 +25,7 @@
         </main>
     </div>
 
-    <!-- MODAL PRINCIPAL DE PLACAS E PORTAS -->
     <div id="super-modal" class="modal-overlay">
-        <!-- Classe modal-large para utilizar toda a largura da tela -->
         <div class="modal-content modal-large">
             <div class="modal-header">
                 <h3 id="modal-title" style="margin: 0; display: flex; align-items: center; gap: 8px; color: var(--m3-on-surface);">
@@ -52,14 +37,10 @@
             </div>
             <div class="modal-body">
                 
-                <!-- VIEW 1: PLACAS -->
                 <div id="view-placas">
-                    <div class="placas-grid" id="placas-container">
-                        <!-- Botões das placas serão injetados aqui -->
-                    </div>
+                    <div class="placas-grid" id="placas-container"></div>
                 </div>
 
-                <!-- VIEW 2: PORTAS -->
                 <div id="view-portas" style="display: none;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <button id="btn-back" class="btn-voltar-placas" style="margin-bottom: 0;" onclick="Dashboard360Engine.showPlacas()">
@@ -67,7 +48,6 @@
                         </button>
                     </div>
 
-                    <!-- Tabela com barras de rolagem nativa -->
                     <div class="table-container">
                         <table class="noc-table">
                             <thead>
@@ -80,9 +60,7 @@
                                     <th style="text-align: center;">POTÊNCIA</th>
                                 </tr>
                             </thead>
-                            <tbody id="portas-tbody">
-                                <!-- Linhas cruzadas das portas serão injetadas aqui -->
-                            </tbody>
+                            <tbody id="portas-tbody"></tbody>
                         </table>
                     </div>
                 </div>
@@ -91,31 +69,25 @@
         </div>
     </div>
 
-    <!-- Rodapé do Sistema -->
     <div id="footer-placeholder"></div>
 
-    <!-- Dependências Vitais do Sistema -->
     <script src="config.js"></script>
     <script src="api-service.js"></script>
     <script src="data-mapper.js"></script>
     <script src="data-store.js"></script>
     <script src="layout.js"></script>
     
-    <!-- Os motores base -->
     <script src="olt-engine.js"></script>
     <script src="energia-engine.js"></script>
     <script src="potencia-engine.js"></script>
     <script src="temperatura-engine.js"></script>
-
-    <!-- O motor da nossa nova página -->
     <script src="dashboard360-engine.js"></script>
 
-    <!-- Inicia o Layout -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof loadHeader === 'function') loadHeader({ title: "Dashboard 360", exactTitle: true });
             if (typeof loadFooter === 'function') loadFooter();
-            if (typeof updateGlobalTimestamp === 'function') updateGlobalTimestamp(); // Ativa o relógio do cabeçalho
+            if (typeof updateGlobalTimestamp === 'function') updateGlobalTimestamp(); 
         });
     </script>
 </body>

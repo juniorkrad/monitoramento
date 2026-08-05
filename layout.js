@@ -1,15 +1,67 @@
 // ==============================================================================
 // layout.js - Construtor de Layout e Menu Inteligente (Com Busca e Emergência Autenticada)
-// Atualização: Injeção dos Modais de Relatório PDF e Boletim Gerencial + Dashboard 360
+// Atualização: Injeção automática de Fontes, PWA, Favicon, GSI e Service Worker
 // ==============================================================================
 
-(function loadIconFont() {
-    const fontUrl = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200';
-    if (!document.querySelector(`link[href="${fontUrl}"]`)) {
+(function setupGlobalHead() {
+    // 1. Injeção de Fontes de Ícones (Material Symbols)
+    const iconFontUrl = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200';
+    if (!document.querySelector(`link[href="${iconFontUrl}"]`)) {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = fontUrl;
+        link.href = iconFontUrl;
         document.head.appendChild(link);
+    }
+
+    // 2. Injeção do Favicon Global
+    if (!document.querySelector('link[rel="icon"]')) {
+        const favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        favicon.type = 'image/png';
+        favicon.href = 'favicon.png';
+        document.head.appendChild(favicon);
+    }
+
+    // 3. Injeção das Google Fonts (Montserrat e Roboto Mono)
+    if (!document.querySelector('link[href*="Montserrat"]')) {
+        const preconnect1 = document.createElement('link');
+        preconnect1.rel = 'preconnect';
+        preconnect1.href = 'https://fonts.googleapis.com';
+        document.head.appendChild(preconnect1);
+
+        const preconnect2 = document.createElement('link');
+        preconnect2.rel = 'preconnect';
+        preconnect2.href = 'https://fonts.gstatic.com';
+        preconnect2.crossOrigin = 'anonymous';
+        document.head.appendChild(preconnect2);
+
+        const fontLink = document.createElement('link');
+        fontLink.rel = 'stylesheet';
+        fontLink.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap';
+        document.head.appendChild(fontLink);
+    }
+
+    // 4. Injeção de PWA Tags (Manifest e Theme Color)
+    if (!document.querySelector('link[rel="manifest"]')) {
+        const manifest = document.createElement('link');
+        manifest.rel = 'manifest';
+        manifest.href = 'manifest.json';
+        document.head.appendChild(manifest);
+    }
+    if (!document.querySelector('meta[name="theme-color"]')) {
+        const themeColor = document.createElement('meta');
+        themeColor.name = 'theme-color';
+        themeColor.content = '#67079f';
+        document.head.appendChild(themeColor);
+    }
+
+    // 5. Injeção do Script do Google Sign-In (GSI)
+    if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+        const gsiScript = document.createElement('script');
+        gsiScript.src = 'https://accounts.google.com/gsi/client';
+        gsiScript.async = true;
+        gsiScript.defer = true;
+        document.head.appendChild(gsiScript);
     }
 })();
 
@@ -825,3 +877,14 @@ function initAutoHide() {
 }
 
 document.addEventListener('DOMContentLoaded', initAutoHide);
+
+// ==============================================================================
+// REGISTRO GLOBAL DO SERVICE WORKER
+// ==============================================================================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+            .then(reg => console.log('Service Worker registrado com sucesso via layout.js!'))
+            .catch(err => console.error('Erro ao registrar Service Worker:', err));
+    });
+}
