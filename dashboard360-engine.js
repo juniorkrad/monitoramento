@@ -176,6 +176,9 @@ window.Dashboard360Engine = {
         document.getElementById('modal-title').innerHTML = `<span class="material-symbols-rounded">dns</span> ${oltId}`;
         document.getElementById('super-modal').style.display = 'flex';
         
+        const btnBoletimOlt = document.getElementById('btn-gerar-boletim-olt-360');
+        if (btnBoletimOlt) btnBoletimOlt.style.display = 'block';
+        
         const pContainer = document.getElementById('placas-container');
         pContainer.className = 'mini-cards-grid'; 
         pContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: var(--m3-on-surface-variant);">Cruzando dados das placas...</div>';
@@ -299,11 +302,16 @@ window.Dashboard360Engine = {
         const btnBack = document.getElementById('btn-back');
         if (btnBack) btnBack.style.display = 'none';
         
+        const btnBoletimOlt = document.getElementById('btn-gerar-boletim-olt-360');
+        if (btnBoletimOlt) btnBoletimOlt.style.display = 'block';
+        
         document.getElementById('modal-title').innerHTML = `<span class="material-symbols-rounded">dns</span> ${this.currentOlt}`;
     },
 
     closeModal: function() {
         document.getElementById('super-modal').style.display = 'none';
+        const btnBoletimOlt = document.getElementById('btn-gerar-boletim-olt-360');
+        if (btnBoletimOlt) btnBoletimOlt.style.display = 'none';
     },
 
     openPortas: function(placa) {
@@ -315,6 +323,9 @@ window.Dashboard360Engine = {
         
         const btnBack = document.getElementById('btn-back');
         if (btnBack) btnBack.style.display = 'flex';
+        
+        const btnBoletimOlt = document.getElementById('btn-gerar-boletim-olt-360');
+        if (btnBoletimOlt) btnBoletimOlt.style.display = 'none';
         
         document.getElementById('modal-title').innerHTML = `<span class="material-symbols-rounded">dns</span> ${this.currentOlt} <span style="color:var(--m3-on-surface-variant); margin: 0 5px;">/</span> Placa ${placa}`;
 
@@ -588,6 +599,660 @@ window.Dashboard360Engine = {
         if (event && event.target.id !== 'client-modal-360' && !event.target.classList.contains('close-modal')) return;
         const modal = document.getElementById('client-modal-360');
         if (modal) modal.style.display = 'none';
+    },
+
+    exportarPlacaTxt: function() {
+        if (!this.currentOlt || !this.currentPlaca) {
+            alert("Nenhuma placa selecionada.");
+            return;
+        }
+
+        const oltName = this.currentOlt;
+        const placa = this.currentPlaca;
+        
+        let txtContent = `=================================================\n`;
+        txtContent += `   RELATÓRIO 360º - ${oltName} (PLACA ${placa})\n`;
+        txtContent += `   Gerado em: ${new Date().toLocaleString('pt-BR')}\n`;
+        txtContent += `=================================================\n\n`;
+        
+        const tbody = document.getElementById('portas-tbody');
+        const rows = tbody.querySelectorAll('tr');
+        
+        if (rows.length === 0 || rows[0].innerText.includes('Nenhuma porta')) {
+            alert('Nenhum dado disponível para exportação.');
+            return;
+        }
+        
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td');
+            if (cols.length >= 6) { 
+                const porta = cols[0].innerText.trim();
+                const circuito = cols[1].innerText.trim();
+                const bairro = cols[2].innerText.trim();
+                const rede = cols[3].innerText.trim();
+                const energia = cols[4].innerText.trim();
+                const potencia = cols[5].innerText.trim();
+                
+                txtContent += `• ${porta.padEnd(10, ' ')} | Circuito: ${circuito.padEnd(10, ' ')} | Bairro: ${bairro.padEnd(45, ' ')} | Rede: ${rede.padEnd(10, ' ')} | Energia: ${energia.padEnd(10, ' ')} | Potência: ${potencia}\n`;
+            }
+        });
+        
+        txtContent += `\n=================================================\n`;
+        
+        const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Relatorio_360_${oltName.replace(/[^a-zA-Z0-9-]/g, '_')}_Placa_${placa}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    },
+
+    gerarBoletimPlaca360Offscreen: async function(event) {
+        if (event) event.stopPropagation();
+        
+        if (!this.currentOlt || !this.currentPlaca) {
+            alert("Nenhuma placa selecionada.");
+            return;
+        }
+
+        const oltId = this.currentOlt;
+        const type = this.currentType;
+        const placa = this.currentPlaca;
+        
+        const btn = event ? event.currentTarget : null;
+        let originalContent = '';
+        if (btn) {
+            originalContent = btn.innerHTML;
+            btn.innerHTML = `<span class="material-symbols-rounded">hourglass_empty</span>`;
+            btn.disabled = true;
+        }
+
+        try {
+            const rows = window.DATA_STORE.olts[oltId]?.slice(1) || [];
+            const rowsCircuitos = window.DATA_STORE.circuitos || [];
+            const rowsLocalidades = window.DATA_STORE.localidades || [];
+
+            const portData = {};
+            let globalTotal = 0, globalOnline = 0, globalOffline = 0, globalPowerOff = 0, globalSumPower = 0, globalValidPowerCount = 0;
+
+            rows.forEach(cols => {
+                if (cols.length === 0) return;
+                const pInfo = DataMapper.extractPort(cols[0], type);
+                if (!pInfo || parseInt(pInfo.placa) !== parseInt(placa)) return;
+
+                const pNum = parseInt(pInfo.porta);
+                const isOnline = DataMapper.isOnline(cols[type === 'nokia' ? 4 : 2], type);
+                const power = DataMapper.parsePowerValue(cols[5]);
+
+                if (!portData[pNum]) {
+                    portData[pNum] = { online: 0, offline: 0, validPowerCount: 0, sumPower: 0, powerOff: 0 };
+                }
+
+                if (isOnline) {
+                    portData[pNum].online++;
+                    globalOnline++;
+                } else {
+                    portData[pNum].offline++;
+                    globalOffline++;
+                }
+                globalTotal++;
+
+                if (DataMapper.isValidPower(power)) {
+                    portData[pNum].validPowerCount++;
+                    portData[pNum].sumPower += power;
+                    globalValidPowerCount++;
+                    globalSumPower += power;
+                }
+            });
+
+            if (window.ENERGY_DATA_STORE?.olts?.[oltId]?.ports?.[placa]) {
+                const energyPorts = window.ENERGY_DATA_STORE.olts[oltId].ports[placa];
+                for (const pt in energyPorts) {
+                    if (portData[pt]) {
+                        portData[pt].powerOff = energyPorts[pt].powerOff || 0;
+                        globalPowerOff += portData[pt].powerOff;
+                    }
+                }
+            }
+
+            let globalMedia = globalValidPowerCount > 0 ? (globalSumPower / globalValidPowerCount).toFixed(1) : "0.0";
+            
+            let portasList = [];
+            const sortedPorts = Object.keys(portData).sort((a,b) => parseInt(a) - parseInt(b));
+
+            sortedPorts.forEach(pt => {
+                const pd = portData[pt];
+                const totalClients = pd.online + pd.offline;
+                const circuito = DataMapper.getCircuitInfo(rowsCircuitos, { id: oltId, type: type }, placa, pt);
+                const bairro = DataMapper.getBairroInfo(rowsLocalidades, oltId, placa, pt, type) || 'N/A';
+                const potMedia = pd.validPowerCount > 0 ? (pd.sumPower / pd.validPowerCount).toFixed(1) : 0;
+
+                portasList.push({
+                    porta: pt,
+                    circuito: circuito,
+                    bairro: bairro,
+                    total: totalClients,
+                    online: pd.online,
+                    offline: pd.offline,
+                    powerOff: pd.powerOff,
+                    media: potMedia !== 0 ? potMedia + ' dBm' : 'N/A'
+                });
+            });
+
+            const dataHora = new Date().toLocaleString('pt-BR');
+            const wrapperDiv = document.createElement('div');
+            wrapperDiv.id = `offscreen-boletim-placa-360`;
+            wrapperDiv.style.position = 'absolute';
+            wrapperDiv.style.left = '-9999px';
+            wrapperDiv.style.top = '0';
+            wrapperDiv.style.backgroundColor = 'transparent';
+
+            let tableRowsHtml = '';
+            portasList.forEach(stat => {
+                const circuitoPilula = `<span style="border: 1px solid rgba(255,255,255,0.2); background-color: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 8px; font-family: var(--font-family-mono); font-size: 0.85rem;">${stat.circuito}</span>`;
+
+                tableRowsHtml += `
+                    <tr>
+                        <td style="text-align: left; font-family: var(--font-family); font-weight: bold;">Porta ${String(stat.porta).padStart(2, '0')}</td>
+                        <td style="text-align: left;">${circuitoPilula}</td>
+                        <td style="text-align: left; font-size: 0.85rem; color: #CAC4D0;">${stat.bairro}</td>
+                        <td style="text-align: center;">${stat.total}</td>
+                        <td style="text-align: center; color: #4ade80;">${stat.online}</td>
+                        <td style="text-align: center; color: #f87171;">${stat.offline}</td>
+                        <td style="text-align: center; color: #fbbf24;">${stat.powerOff}</td>
+                        <td style="text-align: center; font-family: var(--font-family-mono);">${stat.media}</td>
+                    </tr>
+                `;
+            });
+
+            wrapperDiv.innerHTML = `
+                <div style="width: 1200px; background-color: #2f0e51; color: #ffffff; padding: 30px; border-radius: 24px; box-sizing: border-box; font-family: 'Montserrat', sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 25px;">
+                        <div style="display: flex; align-items: center; gap: 20px;">
+                            <img src="logo-relatorio.png" alt="Logo" style="height: 60px; object-fit: contain;" onerror="this.style.display='none';">
+                            <div>
+                                <h2 style="margin: 0; font-size: 1.8rem; color: #fbbf24; display: flex; align-items: center; gap: 10px;">
+                                    <span class="material-symbols-rounded" style="font-size: 32px;">dashboard</span> BOLETIM 360º - PLACA ${placa}
+                                </h2>
+                                <h3 style="margin: 5px 0 0 0; font-size: 1.3rem; text-transform: uppercase; color: #fff;">${oltId}</h3>
+                            </div>
+                        </div>
+                        <div style="text-align: right; color: #CAC4D0; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+                            Gerado em: ${dataHora}
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 25px;">
+                        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #ffffff; margin-bottom: 5px;">search</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px;">${globalTotal}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Total Analisado</div>
+                        </div>
+                        <div style="background: rgba(74, 222, 128, 0.05); border: 1px solid rgba(74, 222, 128, 0.2); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #4ade80; margin-bottom: 5px;">arrow_upward</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; color: #4ade80;">${globalOnline}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Online</div>
+                        </div>
+                        <div style="background: rgba(248, 113, 113, 0.05); border: 1px solid rgba(248, 113, 113, 0.2); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #f87171; margin-bottom: 5px;">arrow_downward</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; color: #f87171;">${globalOffline}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Offline</div>
+                        </div>
+                        <div style="background: rgba(251, 191, 36, 0.05); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #fbbf24; margin-bottom: 5px;">power_off</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; color: #fbbf24;">${globalPowerOff}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Sem Energia</div>
+                        </div>
+                        <div style="background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #a855f7; margin-bottom: 5px;">vital_signs</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; color: #a855f7;">${globalMedia}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Média (dBm)</div>
+                        </div>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                        <thead>
+                            <tr>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left; border-radius: 8px 0 0 0;">PORTA</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: left;">CIRCUITO</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: left;">BAIRRO</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: center;">TOTAL</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #4ade80; text-align: center;">ONLINE</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #f87171; text-align: center;">OFFLINE</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: center;">ENERGIA</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #a855f7; text-align: center; border-radius: 0 8px 0 0;">POTÊNCIA</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-family: 'Montserrat', sans-serif;">
+                            ${tableRowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            document.body.appendChild(wrapperDiv);
+
+            const tds = wrapperDiv.querySelectorAll('td');
+            tds.forEach(td => {
+                td.style.padding = '12px';
+                td.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            });
+
+            await new Promise(r => setTimeout(r, 500)); 
+
+            const canvas = await html2canvas(wrapperDiv, { backgroundColor: null, scale: 2, logging: false });
+            
+            const link = document.createElement('a');
+            link.download = `Boletim_360_${oltId}_Placa_${placa}_${new Date().getTime()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            
+            document.body.removeChild(wrapperDiv);
+
+        } catch (error) {
+            console.error('Erro ao gerar boletim da Placa 360:', error);
+            alert('Ocorreu um erro ao gerar o boletim da Placa.');
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
+    },
+
+    gerarBoletimOlt360Offscreen: async function(event) {
+        if (event) event.stopPropagation();
+
+        if (!this.currentOlt) {
+            alert("Nenhuma OLT selecionada.");
+            return;
+        }
+
+        const oltId = this.currentOlt;
+        const type = this.currentType;
+        const boards = this.currentBoards;
+
+        const btn = event ? event.currentTarget : null;
+        let originalContent = '';
+        if (btn) {
+            originalContent = btn.innerHTML;
+            btn.innerHTML = `<span class="material-symbols-rounded" style="font-size: 26px;">hourglass_empty</span>`;
+            btn.disabled = true;
+        }
+
+        try {
+            const rows = window.DATA_STORE.olts[oltId]?.slice(1) || [];
+
+            let placaData = {};
+            for (let i = 1; i <= boards; i++) {
+                placaData[i] = { total: 0, online: 0, offline: 0, powerOff: 0, sumPower: 0, validPowerCount: 0 };
+            }
+
+            let globalTotal = 0, globalOnline = 0, globalOffline = 0, globalPowerOff = 0, globalSumPower = 0, globalValidPowerCount = 0;
+
+            rows.forEach(cols => {
+                if (cols.length === 0) return;
+                const pInfo = DataMapper.extractPort(cols[0], type);
+                if (!pInfo) return;
+
+                const placa = parseInt(pInfo.placa);
+                if (placa > boards || placa < 1) return;
+
+                const isOnline = DataMapper.isOnline(cols[type === 'nokia' ? 4 : 2], type);
+                const power = DataMapper.parsePowerValue(cols[5]);
+
+                placaData[placa].total++;
+                globalTotal++;
+
+                if (isOnline) {
+                    placaData[placa].online++;
+                    globalOnline++;
+                } else {
+                    placaData[placa].offline++;
+                    globalOffline++;
+                }
+
+                if (DataMapper.isValidPower(power)) {
+                    placaData[placa].validPowerCount++;
+                    placaData[placa].sumPower += power;
+                    globalValidPowerCount++;
+                    globalSumPower += power;
+                }
+            });
+
+            if (window.ENERGY_DATA_STORE?.olts?.[oltId]?.ports) {
+                const energyBoards = window.ENERGY_DATA_STORE.olts[oltId].ports;
+                for (const placa in energyBoards) {
+                    const energyPorts = energyBoards[placa];
+                    for (const pt in energyPorts) {
+                        const poff = energyPorts[pt].powerOff || 0;
+                        if (placaData[placa]) {
+                            placaData[placa].powerOff += poff;
+                        }
+                        globalPowerOff += poff;
+                    }
+                }
+            }
+
+            let globalMedia = globalValidPowerCount > 0 ? (globalSumPower / globalValidPowerCount).toFixed(1) : "0.0";
+
+            let tableRowsHtml = '';
+            for (let i = 1; i <= boards; i++) {
+                const pd = placaData[i];
+                const potMedia = pd.validPowerCount > 0 ? (pd.sumPower / pd.validPowerCount).toFixed(1) : 0;
+                const potDisplay = potMedia !== 0 ? potMedia + ' dBm' : 'N/A';
+
+                tableRowsHtml += `
+                    <tr>
+                        <td style="text-align: left; font-family: var(--font-family); font-weight: bold;">Placa ${i}</td>
+                        <td style="text-align: center;">${pd.total}</td>
+                        <td style="text-align: center; color: #4ade80;">${pd.online}</td>
+                        <td style="text-align: center; color: #f87171;">${pd.offline}</td>
+                        <td style="text-align: center; color: #fbbf24;">${pd.powerOff}</td>
+                        <td style="text-align: center; font-family: var(--font-family-mono);">${potDisplay}</td>
+                    </tr>
+                `;
+            }
+
+            const dataHora = new Date().toLocaleString('pt-BR');
+            const wrapperDiv = document.createElement('div');
+            wrapperDiv.id = `offscreen-boletim-olt-360`;
+            wrapperDiv.style.position = 'absolute';
+            wrapperDiv.style.left = '-9999px';
+            wrapperDiv.style.top = '0';
+            wrapperDiv.style.backgroundColor = 'transparent';
+
+            wrapperDiv.innerHTML = `
+                <div style="width: 1200px; background-color: #2f0e51; color: #ffffff; padding: 30px; border-radius: 24px; box-sizing: border-box; font-family: 'Montserrat', sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 25px;">
+                        <div style="display: flex; align-items: center; gap: 20px;">
+                            <img src="logo-relatorio.png" alt="Logo" style="height: 60px; object-fit: contain;" onerror="this.style.display='none';">
+                            <div>
+                                <h2 style="margin: 0; font-size: 1.8rem; color: #fbbf24; display: flex; align-items: center; gap: 10px;">
+                                    <span class="material-symbols-rounded" style="font-size: 32px;">dashboard</span> BOLETIM 360º - OLT
+                                </h2>
+                                <h3 style="margin: 5px 0 0 0; font-size: 1.3rem; text-transform: uppercase; color: #fff;">${oltId}</h3>
+                            </div>
+                        </div>
+                        <div style="text-align: right; color: #CAC4D0; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+                            Gerado em: ${dataHora}
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 25px;">
+                        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #ffffff; margin-bottom: 5px;">search</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px;">${globalTotal}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Total Analisado</div>
+                        </div>
+                        <div style="background: rgba(74, 222, 128, 0.05); border: 1px solid rgba(74, 222, 128, 0.2); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #4ade80; margin-bottom: 5px;">arrow_upward</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; color: #4ade80;">${globalOnline}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Online</div>
+                        </div>
+                        <div style="background: rgba(248, 113, 113, 0.05); border: 1px solid rgba(248, 113, 113, 0.2); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #f87171; margin-bottom: 5px;">arrow_downward</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; color: #f87171;">${globalOffline}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Offline</div>
+                        </div>
+                        <div style="background: rgba(251, 191, 36, 0.05); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #fbbf24; margin-bottom: 5px;">power_off</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; color: #fbbf24;">${globalPowerOff}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Sem Energia</div>
+                        </div>
+                        <div style="background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 15px; text-align: center;">
+                            <div class="material-symbols-rounded" style="font-size: 28px; color: #a855f7; margin-bottom: 5px;">vital_signs</div>
+                            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; color: #a855f7;">${globalMedia}</div>
+                            <div style="font-size: 0.8rem; color: #CAC4D0; text-transform: uppercase;">Média (dBm)</div>
+                        </div>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                        <thead>
+                            <tr>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left; border-radius: 8px 0 0 0;">PLACA</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: center;">TOTAL</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #4ade80; text-align: center;">ONLINE</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #f87171; text-align: center;">OFFLINE</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: center;">ENERGIA</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #a855f7; text-align: center; border-radius: 0 8px 0 0;">POTÊNCIA</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-family: 'Montserrat', sans-serif;">
+                            ${tableRowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            document.body.appendChild(wrapperDiv);
+
+            const tds = wrapperDiv.querySelectorAll('td');
+            tds.forEach(td => {
+                td.style.padding = '12px';
+                td.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            });
+
+            await new Promise(r => setTimeout(r, 500));
+
+            const canvas = await html2canvas(wrapperDiv, { backgroundColor: null, scale: 2, logging: false });
+
+            const link = document.createElement('a');
+            link.download = `Boletim_360_OLT_${oltId}_${new Date().getTime()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+
+            document.body.removeChild(wrapperDiv);
+
+        } catch (error) {
+            console.error('Erro ao gerar boletim da OLT 360:', error);
+            alert('Ocorreu um erro ao gerar o boletim da OLT.');
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
+    },
+
+    gerarBoletimEmergencia360Offscreen: async function(event) {
+        if (event) event.stopPropagation();
+
+        if (!this.currentOlt) {
+            alert("Nenhuma OLT selecionada.");
+            return;
+        }
+
+        const oltId = this.currentOlt;
+        const type = this.currentType;
+        const boards = this.currentBoards;
+
+        const btn = event ? event.currentTarget : null;
+        let originalContent = '';
+        if (btn) {
+            originalContent = btn.innerHTML;
+            btn.innerHTML = `<span class="material-symbols-rounded" style="font-size: 26px;">hourglass_empty</span>`;
+            btn.disabled = true;
+        }
+
+        try {
+            const rows = window.DATA_STORE.olts[oltId]?.slice(1) || [];
+            const rowsCircuitos = window.DATA_STORE.circuitos || [];
+            const rowsLocalidades = window.DATA_STORE.localidades || [];
+
+            let portData = {};
+            for (let i = 1; i <= boards; i++) {
+                portData[i] = {};
+            }
+
+            rows.forEach(cols => {
+                if (cols.length === 0) return;
+                const pInfo = DataMapper.extractPort(cols[0], type);
+                if (!pInfo) return;
+
+                const placa = parseInt(pInfo.placa);
+                const porta = parseInt(pInfo.porta);
+                if (placa > boards || placa < 1) return;
+
+                const isOnline = DataMapper.isOnline(cols[type === 'nokia' ? 4 : 2], type);
+                const power = DataMapper.parsePowerValue(cols[5]);
+
+                if (!portData[placa][porta]) {
+                    portData[placa][porta] = { online: 0, offline: 0, sumPower: 0, validPowerCount: 0, powerOff: 0 };
+                }
+
+                if (isOnline) portData[placa][porta].online++;
+                else portData[placa][porta].offline++;
+
+                if (DataMapper.isValidPower(power)) {
+                    portData[placa][porta].validPowerCount++;
+                    portData[placa][porta].sumPower += power;
+                }
+            });
+
+            if (window.ENERGY_DATA_STORE?.olts?.[oltId]?.ports) {
+                const energyBoards = window.ENERGY_DATA_STORE.olts[oltId].ports;
+                for (const placa in energyBoards) {
+                    const energyPorts = energyBoards[placa];
+                    for (const pt in energyPorts) {
+                        const poff = energyPorts[pt].powerOff || 0;
+                        if (portData[placa] && portData[placa][pt]) {
+                            portData[placa][pt].powerOff = poff;
+                        }
+                    }
+                }
+            }
+
+            let portasCriticas = [];
+
+            for (let i = 1; i <= boards; i++) {
+                const ports = portData[i];
+                for (const pt in ports) {
+                    const pd = ports[pt];
+                    const total = pd.online + pd.offline;
+                    
+                    if (total >= 5 && pd.offline === total) {
+                        const circuito = DataMapper.getCircuitInfo(rowsCircuitos, { id: oltId, type: type }, i, pt);
+                        const bairro = DataMapper.getBairroInfo(rowsLocalidades, oltId, i, pt, type) || 'N/A';
+                        const potMedia = pd.validPowerCount > 0 ? (pd.sumPower / pd.validPowerCount).toFixed(1) : 0;
+                        const potDisplay = potMedia !== 0 ? potMedia + ' dBm' : 'N/A';
+
+                        portasCriticas.push({
+                            placa: i,
+                            porta: pt,
+                            circuito: circuito,
+                            bairro: bairro,
+                            total: total,
+                            offline: pd.offline,
+                            powerOff: pd.powerOff,
+                            media: potDisplay
+                        });
+                    }
+                }
+            }
+
+            const dataHora = new Date().toLocaleString('pt-BR');
+            const wrapperDiv = document.createElement('div');
+            wrapperDiv.id = `offscreen-boletim-emergencia-360`;
+            wrapperDiv.style.position = 'absolute';
+            wrapperDiv.style.left = '-9999px';
+            wrapperDiv.style.top = '0';
+            wrapperDiv.style.backgroundColor = 'transparent';
+
+            let conteudoHtml = '';
+
+            if (portasCriticas.length === 0) {
+                conteudoHtml = `
+                    <div style="text-align: center; padding: 60px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 25px;">
+                        <span class="material-symbols-rounded" style="font-size: 64px; color: #4ade80; margin-bottom: 15px; display:block;">check_circle</span>
+                        <h2 style="margin: 0; color: #4ade80; font-size: 2rem;">OLT Estável</h2>
+                        <p style="color: #CAC4D0; margin-top: 10px; font-size: 1.1rem;">Nenhuma porta em estado crítico (100% offline) detectada nesta OLT.</p>
+                    </div>
+                `;
+            } else {
+                let tableRowsHtml = '';
+                portasCriticas.forEach(p => {
+                    const circuitoPilula = `<span style="border: 1px solid rgba(255,255,255,0.2); background-color: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 8px; font-family: var(--font-family-mono); font-size: 0.9rem;">${p.circuito}</span>`;
+
+                    tableRowsHtml += `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <td style="padding: 12px; font-family: 'Roboto Mono', monospace; font-weight: bold; text-align: left;">${p.placa}/${String(p.porta).padStart(2, '0')}</td>
+                            <td style="padding: 12px; text-align: left;">${circuitoPilula}</td>
+                            <td style="padding: 12px; text-align: left; color: #CAC4D0; font-size: 0.85rem;">${p.bairro}</td>
+                            <td style="padding: 12px; text-align: center; color: #f87171; font-family: 'Roboto Mono', monospace; font-weight: bold;">100%</td>
+                            <td style="padding: 12px; text-align: center; color: #fbbf24;">${p.powerOff}</td>
+                            <td style="padding: 12px; text-align: center; font-family: 'Roboto Mono', monospace;">${p.media}</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <span style="padding: 6px 12px; border-radius: 12px; font-weight: bold; font-size: 0.85rem; background: rgba(0,0,0,0.6); color: #ff3333; border: 1px solid #ff3333;">CRÍTICO</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                conteudoHtml = `
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                        <thead>
+                            <tr>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: left; border-radius: 8px 0 0 0;">PLACA/PORTA</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: left;">CIRCUITO</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ffffff; text-align: left;">BAIRRO</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ff3333; text-align: center;">IMPACTO</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #fbbf24; text-align: center;">ENERGIA</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #a855f7; text-align: center;">POTÊNCIA</th>
+                                <th style="background: rgba(0,0,0,0.3); padding: 12px; color: #ff3333; text-align: center; border-radius: 0 8px 0 0;">STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-family: 'Montserrat', sans-serif;">
+                            ${tableRowsHtml}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            wrapperDiv.innerHTML = `
+                <div style="width: 1200px; min-height: 850px; background-color: #2f0e51; color: #ffffff; padding: 30px; border-radius: 24px; box-sizing: border-box; font-family: 'Montserrat', sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 25px;">
+                        <div style="display: flex; align-items: center; gap: 20px;">
+                            <img src="logo-relatorio.png" alt="Logo" style="height: 60px; object-fit: contain;" onerror="this.style.display='none';">
+                            <div>
+                                <h2 style="margin: 0; font-size: 1.8rem; color: #ff3333; display: flex; align-items: center; gap: 10px;">
+                                    <span class="material-symbols-rounded" style="font-size: 32px;">warning</span> BOLETIM 360º - EMERGÊNCIA
+                                </h2>
+                                <h3 style="margin: 5px 0 0 0; font-size: 1.3rem; text-transform: uppercase; color: #fff;">${oltId}</h3>
+                            </div>
+                        </div>
+                        <div style="text-align: right; color: #CAC4D0; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+                            Gerado em: ${dataHora}
+                        </div>
+                    </div>
+
+                    ${conteudoHtml}
+                </div>
+            `;
+
+            document.body.appendChild(wrapperDiv);
+
+            await new Promise(r => setTimeout(r, 500));
+
+            const canvas = await html2canvas(wrapperDiv, { backgroundColor: null, scale: 2, logging: false });
+
+            const link = document.createElement('a');
+            link.download = `Boletim_Emergencia_360_${oltId}_${new Date().getTime()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+
+            document.body.removeChild(wrapperDiv);
+
+        } catch (error) {
+            console.error('Erro ao gerar boletim de emergência 360:', error);
+            alert('Ocorreu um erro ao gerar o boletim de emergência.');
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
     }
 };
 

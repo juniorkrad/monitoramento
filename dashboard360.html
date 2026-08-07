@@ -32,6 +32,16 @@
                     <span class="material-symbols-rounded">dns</span> OLT Detalhes
                 </h3>
                 <div style="display: flex; gap: 15px; align-items: center;">
+                    <div id="btn-gerar-boletim-olt-360" style="display: none;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button onclick="Dashboard360Engine.gerarBoletimEmergencia360Offscreen(event)" class="card-header-button" title="Gerar Boletim de Emergência (Portas Críticas)" style="color: #ff3333; border: 1px solid rgba(255, 51, 51, 0.3); background: rgba(255, 51, 51, 0.1);">
+                                <span class="material-symbols-rounded">warning</span>
+                            </button>
+                            <button onclick="Dashboard360Engine.gerarBoletimOlt360Offscreen(event)" class="card-header-button" title="Gerar Boletim da OLT" style="background: transparent; border: none; color: var(--m3-on-surface-variant); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: color 0.2s;">
+                                <span class="material-symbols-rounded" style="font-size: 26px;">assignment</span>
+                            </button>
+                        </div>
+                    </div>
                     <button class="close-btn" style="background: none; border: none; color: var(--m3-on-surface-variant); cursor: pointer; font-size: 24px;" onclick="Dashboard360Engine.closeModal()">&times;</button>
                 </div>
             </div>
@@ -46,6 +56,14 @@
                         <button id="btn-back" class="btn-voltar-placas" style="margin-bottom: 0;" onclick="Dashboard360Engine.showPlacas()">
                             <span class="material-symbols-rounded">arrow_back</span> Voltar para Placas
                         </button>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-gerar-boletim-360" class="btn-voltar-placas" style="margin-bottom: 0; padding: 10px;" onclick="Dashboard360Engine.gerarBoletimPlaca360Offscreen(event)" title="Gerar Boletim de Placa">
+                                <span class="material-symbols-rounded">assignment</span>
+                            </button>
+                            <button id="btn-export-txt-360" class="btn-voltar-placas" style="margin-bottom: 0; padding: 10px;" onclick="Dashboard360Engine.exportarPlacaTxt()" title="Exportar para TXT">
+                                <span class="material-symbols-rounded">download</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="table-container">
@@ -71,6 +89,7 @@
 
     <div id="footer-placeholder"></div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="config.js"></script>
     <script src="api-service.js"></script>
     <script src="data-mapper.js"></script>

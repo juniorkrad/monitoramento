@@ -1,6 +1,6 @@
 // ==============================================================================
 // layout.js - Construtor de Layout e Menu Inteligente (Com Busca e Emergência Autenticada)
-// Atualização: Injeção automática de Fontes, PWA, Favicon, GSI e Service Worker
+// Atualização: Injeção automática de Fontes, PWA, Favicon, GSI, Service Worker e Busca de Circuito
 // ==============================================================================
 
 (function setupGlobalHead() {
@@ -84,6 +84,7 @@ function loadHeader(config) {
     
     loadSidebar(currentPage);
     injectSearchModal(); 
+    injectCircuitSearchModal();
     injectEmergencyModal(); 
     injectRelatorioModal();
     injectBoletimModal();
@@ -141,6 +142,7 @@ function loadSidebar(currentPage) {
                     POPS
                 </a>
 
+                <!-- BLOCO TEMPORARIAMENTE OCULTO (TESTE DASHBOARD 360)
                 <a href="olt.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">dns</span>
                     STATUS OLTS
@@ -160,6 +162,7 @@ function loadSidebar(currentPage) {
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">device_thermostat</span>
                     TEMPERATURA
                 </a>
+                FIM BLOCO OCULTO -->
 
                 <a href="equipamentos.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">router</span>
@@ -171,6 +174,11 @@ function loadSidebar(currentPage) {
                 <a href="#" onclick="openSearchModal(); return false;" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left; background-color: var(--m3-surface-container-highest);">
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px; color: var(--m3-primary);">manage_search</span>
                     BUSCAR CLIENTE
+                </a>
+
+                <a href="#" onclick="if(window.openCircuitSearchModal) window.openCircuitSearchModal(); return false;" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left; background-color: var(--m3-surface-container-highest);">
+                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px; color: var(--m3-primary);">network_node</span>
+                    BUSCAR CIRCUITO
                 </a>
 
                 <a href="#" onclick="if(window.openBoletimModal) window.openBoletimModal(); return false;" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left; background-color: var(--m3-surface-container-highest);">
@@ -285,6 +293,169 @@ window.closeBoletimModal = function(event) {
     if (event && event.target.id !== 'boletim-gerencial-modal' && event.type === 'click') return;
     const modal = document.getElementById('boletim-gerencial-modal');
     if(modal) modal.classList.remove('active');
+}
+
+// ==============================================================================
+// SISTEMA DE BUSCA REVERSA DE CIRCUITO (MODAL E LÓGICA)
+// ==============================================================================
+
+function injectCircuitSearchModal() {
+    if (document.getElementById('search-circuit-modal')) return;
+
+    let oltOptions = '<option value="">Selecione a OLT...</option>';
+    if (typeof GLOBAL_MASTER_OLT_LIST !== 'undefined') {
+        GLOBAL_MASTER_OLT_LIST.forEach(olt => {
+            oltOptions += `<option value="${olt.id}">${olt.id}</option>`;
+        });
+    }
+
+    const modalHtml = `
+        <div class="search-modal-overlay" id="search-circuit-modal" onclick="closeCircuitSearchModal(event)">
+            <div class="search-modal" onclick="event.stopPropagation()">
+                <div class="search-modal-header">
+                    <h2><span class="material-symbols-rounded">network_node</span> Busca Reversa de Circuito</h2>
+                    <button class="search-close-btn" onclick="closeCircuitSearchModal()" title="Fechar"><span class="material-symbols-rounded">close</span></button>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+                    <select id="circuit-olt-select" class="filter-select" style="width: 100%; padding: 14px 16px; border-radius: 12px; background-color: var(--m3-surface-container-highest); border: 1px solid var(--m3-outline); color: var(--m3-on-surface); font-size: 1.1rem; outline: none; font-family: 'Montserrat', sans-serif;">
+                        ${oltOptions}
+                    </select>
+                    
+                    <div class="search-input-group">
+                        <input type="text" id="circuit-search-input" class="search-input" placeholder="Digite o nome do circuito..." autocomplete="off" onkeypress="if(event.key === 'Enter') executeCircuitSearch()">
+                        <button class="search-btn" onclick="executeCircuitSearch()" title="Pesquisar">
+                            <span class="material-symbols-rounded" style="font-size: 28px;">search</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="circuit-search-results-area" class="search-results-container" style="margin-top: 10px;">
+                    <div style="text-align:center; color: var(--m3-on-surface-variant); padding: 20px; font-size: 0.95rem;">
+                        Selecione a OLT e digite o nome do circuito para descobrir em qual Placa e Porta ele está provisionado.
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+window.openCircuitSearchModal = function() {
+    injectCircuitSearchModal(); 
+    document.getElementById('search-circuit-modal').classList.add('active');
+    document.getElementById('circuit-olt-select').value = '';
+    document.getElementById('circuit-search-input').value = '';
+    document.getElementById('circuit-search-results-area').innerHTML = `
+        <div style="text-align:center; color: var(--m3-on-surface-variant); padding: 20px; font-size: 0.95rem;">
+            Selecione a OLT e digite o nome do circuito para descobrir em qual Placa e Porta ele está provisionado.
+        </div>
+    `;
+    setTimeout(() => document.getElementById('circuit-olt-select').focus(), 100);
+    
+    const sidebar = document.getElementById('main-sidebar');
+    if (sidebar && sidebar.classList.contains('active')) {
+        toggleSidebar();
+    }
+}
+
+window.closeCircuitSearchModal = function(event) {
+    if (event && event.target.id !== 'search-circuit-modal' && event.type === 'click') return;
+    const modal = document.getElementById('search-circuit-modal');
+    if(modal) modal.classList.remove('active');
+}
+
+window.executeCircuitSearch = function() {
+    const oltId = document.getElementById('circuit-olt-select').value;
+    const inputField = document.getElementById('circuit-search-input');
+    const input = inputField.value.trim().toUpperCase(); 
+    const resultsArea = document.getElementById('circuit-search-results-area');
+    
+    if (!oltId) {
+        resultsArea.innerHTML = `<div style="text-align:center; color: var(--m3-error); padding: 20px;">Por favor, selecione uma OLT.</div>`;
+        return;
+    }
+
+    if (input.length < 3) {
+        resultsArea.innerHTML = `<div style="text-align:center; color: var(--m3-error); padding: 20px;">Por favor, digite pelo menos 3 caracteres para realizar a busca do circuito.</div>`;
+        return;
+    }
+
+    resultsArea.innerHTML = `
+        <div class="search-loading">
+            <div class="spinner"></div>
+            <span>Buscando circuito na OLT ${oltId}...</span>
+        </div>
+    `;
+
+    setTimeout(() => {
+        if (!window.DATA_STORE || !window.DATA_STORE.circuitos) {
+            resultsArea.innerHTML = `<div style="text-align:center; color: var(--m3-error); padding: 20px;">Dados de circuitos não carregados. Aguarde a sincronização.</div>`;
+            return;
+        }
+
+        const oltConfig = GLOBAL_MASTER_OLT_LIST.find(o => o.id === oltId);
+        if (!oltConfig) return;
+
+        let foundResults = [];
+        const rowsCircuitos = window.DATA_STORE.circuitos;
+        const rowsLocalidades = window.DATA_STORE.localidades || [];
+
+        for(let placa = 1; placa <= oltConfig.boards; placa++) {
+            let maxPorts = (oltConfig.type === 'furukawa-10') ? 4 : 16;
+            for(let porta = 1; porta <= maxPorts; porta++) {
+                let circ = DataMapper.getCircuitInfo(rowsCircuitos, oltConfig, placa, porta);
+                if (circ && circ !== '-' && circ.toUpperCase().includes(input)) {
+                    let bairro = DataMapper.getBairroInfo(rowsLocalidades, oltId, placa, porta, oltConfig.type) || 'N/A';
+                    foundResults.push({
+                        placa: placa,
+                        porta: porta,
+                        circuito: circ,
+                        bairro: bairro
+                    });
+                }
+            }
+        }
+
+        if (foundResults.length === 0) {
+            resultsArea.innerHTML = `
+                <div style="text-align:center; padding: 30px; color: var(--m3-on-surface-variant);">
+                    <span class="material-symbols-rounded" style="font-size: 40px; margin-bottom: 10px; opacity: 0.5;">search_off</span><br>
+                    Nenhum circuito correspondente a <b>"${input}"</b> foi encontrado na OLT ${oltId}.
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        foundResults.forEach(res => {
+            html += `
+                <div class="search-result-card" style="padding: 15px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        
+                        <div style="display: flex; align-items: center; gap: 6px;" title="Circuito">
+                            <span class="material-symbols-rounded" style="color: var(--m3-color-primary);">network_node</span> 
+                            <strong style="font-family: var(--font-family-mono); font-size: 1.05rem;">${res.circuito}</strong>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Nome da OLT">
+                            <span class="material-symbols-rounded" style="font-size: 20px;">dns</span> ${oltId}
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Placa/Porta">
+                            <span class="material-symbols-rounded" style="font-size: 20px;">developer_board</span> Placa ${res.placa} / Porta ${res.porta}
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--m3-on-surface-variant);" title="Bairro">
+                            <span class="material-symbols-rounded" style="font-size: 20px;">location_on</span> ${res.bairro}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        resultsArea.innerHTML = html;
+    }, 100);
 }
 
 // ==============================================================================
