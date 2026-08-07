@@ -454,8 +454,8 @@ window.Dashboard360Engine = {
                             </span>
                         </td>
                         <td style="color:var(--m3-on-surface-variant); font-size: 0.9rem;">${bairro}</td>
-                        <td style="text-align: center;"><span class="status ${redeStatusClass}">${redeStatusText}</span></td>
-                        <td style="text-align: center;"><span class="status ${energiaClass}">${energiaText}</span></td>
+                        <td style="text-align: center;"><span class="status ${redeStatusClass} clickable-badge" onclick="Dashboard360Engine.openQuickViewModal('${this.currentOlt}', '${placa}', '${pt}', '${safeInfo}', ${totalClients}, ${pd.online}, ${pd.offline}, ${energyOff})" title="Ver Resumo da Porta">${redeStatusText}</span></td>
+                        <td style="text-align: center;"><span class="status ${energiaClass} clickable-badge" onclick="Dashboard360Engine.openQuickViewModal('${this.currentOlt}', '${placa}', '${pt}', '${safeInfo}', ${totalClients}, ${pd.online}, ${pd.offline}, ${energyOff})" title="Ver Resumo da Porta">${energiaText}</span></td>
                         <td style="text-align: center;"><span class="status ${potClass}">${potMedia !== 0 ? potMedia + ' dBm' : 'N/A'}</span></td>
                     </tr>
                 `;
@@ -598,6 +598,21 @@ window.Dashboard360Engine = {
     closeClientModal: function(event) {
         if (event && event.target.id !== 'client-modal-360' && !event.target.classList.contains('close-modal')) return;
         const modal = document.getElementById('client-modal-360');
+        if (modal) modal.style.display = 'none';
+    },
+
+    openQuickViewModal: function(olt, placa, porta, circuito, total, up, down, energy) {
+        document.getElementById('quick-view-title').innerHTML = `<span class="material-symbols-rounded">info</span> ${olt} - ${placa}/${String(porta).padStart(2, '0')} - ${circuito}`;
+        document.getElementById('qv-total').textContent = total;
+        document.getElementById('qv-up').textContent = up;
+        document.getElementById('qv-down').textContent = down;
+        document.getElementById('qv-energy').textContent = energy;
+        document.getElementById('quick-view-modal').style.display = 'flex';
+    },
+
+    closeQuickViewModal: function(event) {
+        if (event && event.target.id !== 'quick-view-modal' && !event.target.classList.contains('close-btn')) return;
+        const modal = document.getElementById('quick-view-modal');
         if (modal) modal.style.display = 'none';
     },
 

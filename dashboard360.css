@@ -199,3 +199,99 @@
     color: var(--m3-on-surface-variant);
     font-weight: 500;
 }
+
+/* ==========================================================================
+   QUICK VIEW MODAL - RESUMO DA PORTA
+   ========================================================================== */
+.clickable-badge {
+    cursor: pointer;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.clickable-badge:hover {
+    transform: scale(1.05);
+    filter: brightness(1.2);
+}
+
+.quick-view-header {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.quick-view-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.quick-stat-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.quick-stat-card .icon {
+    font-size: 32px;
+}
+
+.quick-stat-card .details {
+    display: flex;
+    flex-direction: column;
+}
+
+.quick-stat-card .label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.quick-stat-card .value {
+    font-size: 1.5rem;
+    font-family: var(--font-family-mono);
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+/* Cores dos Cards (Quick View) */
+.card-total { 
+    color: #ffffff; 
+}
+.card-total .icon { 
+    color: #ffffff; 
+}
+
+.card-up { 
+    color: var(--m3-color-success); 
+    border-color: rgba(74, 222, 128, 0.2); 
+    background-color: rgba(74, 222, 128, 0.05); 
+}
+.card-up .icon, .card-up .label { 
+    color: var(--m3-color-success); 
+}
+
+.card-down { 
+    color: var(--m3-color-error); 
+    border-color: rgba(248, 113, 113, 0.2); 
+    background-color: rgba(248, 113, 113, 0.05); 
+}
+.card-down .icon, .card-down .label { 
+    color: var(--m3-color-error); 
+}
+
+.card-energy { 
+    color: #fbbf24; 
+    border-color: rgba(251, 191, 36, 0.2); 
+    background-color: rgba(251, 191, 36, 0.05); 
+}
+.card-energy .icon, .card-energy .label { 
+    color: #fbbf24; 
+}
