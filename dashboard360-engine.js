@@ -349,10 +349,15 @@ window.Dashboard360Engine = {
                 const isOnline = DataMapper.isOnline(cols[this.currentType === 'nokia' ? 4 : 2], this.currentType);
                 const power = DataMapper.parsePowerValue(cols[5]);
                 
+                let onuPos = String(cols[1] || '').trim();
                 let serialVal = '', codigoVal = '', statusRefVal = '';
                 let potenciaVal = String(cols[5] || '').replace(/dbm/ig, '').replace(/\s+/g, '');
                 
                 if (this.currentType === 'nokia') {
+                    const onuParts = onuPos.split('/');
+                    if (onuParts.length > 0) {
+                        onuPos = onuParts[onuParts.length - 1];
+                    }
                     serialVal = cols[2] || '';
                     codigoVal = cols[8] || '';
                     statusRefVal = cols[4] || '';
@@ -376,6 +381,7 @@ window.Dashboard360Engine = {
                 }
 
                 this.clientsData[pNum].push({
+                    onu: onuPos,
                     serial: String(serialVal).trim(),
                     codigo: String(codigoVal).trim(),
                     potenciaStr: potenciaVal,
@@ -488,9 +494,7 @@ window.Dashboard360Engine = {
                                 <table class="noc-table">
                                     <thead>
                                         <tr class="table-header-row">
-                                            <th style="text-align: left;">OLT</th>
-                                            <th style="text-align: center;">Placa/Porta</th>
-                                            <th style="text-align: left;">Circuito</th>
+                                            <th style="text-align: center; width: 80px;">ONU</th>
                                             <th style="text-align: left;">Serial</th>
                                             <th style="text-align: left;">Código</th>
                                             <th style="text-align: center;">Rede</th>
@@ -509,8 +513,8 @@ window.Dashboard360Engine = {
             modal = document.getElementById('client-modal-360');
         }
 
-        const textoCircuito = (circuitoNome && circuitoNome !== "-") ? ` - Circuito: ${circuitoNome}` : "";
-        document.getElementById('client-modal-title').innerHTML = `<span class="material-symbols-rounded">manage_search</span> Placa ${this.currentPlaca} / Porta ${porta}${textoCircuito}`;
+        const textoCircuito = (circuitoNome && circuitoNome !== "-") ? ` - ${circuitoNome}` : "";
+        document.getElementById('client-modal-title').innerHTML = `<span class="material-symbols-rounded">manage_search</span> ${this.currentOlt} - ${this.currentPlaca}/${porta}${textoCircuito}`;
         
         document.getElementById('client-search-input').value = '';
         document.getElementById('client-status-filter').value = 'all';
@@ -521,7 +525,7 @@ window.Dashboard360Engine = {
         const clients = this.clientsData[porta] || [];
 
         if (clients.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Nenhum cliente encontrado.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Nenhum cliente encontrado.</td></tr>`;
         } else {
             let energyOff = 0;
             if (window.ENERGY_DATA_STORE?.olts?.[this.currentOlt]?.ports?.[this.currentPlaca]?.[porta]) {
@@ -550,9 +554,7 @@ window.Dashboard360Engine = {
 
                 let rowHTML = `
                     <tr class="client-row-360 ${c.isOnline ? 'filter-online' : 'filter-offline'}" data-serial="${c.serial}" data-codigo="${c.codigo}">
-                        <td style="padding: 15px; color: var(--m3-on-surface-variant);">${this.currentOlt}</td>
-                        <td style="text-align: center; color: var(--m3-on-surface-variant);">${this.currentPlaca}/${porta}</td>
-                        <td style="color: var(--m3-on-surface-variant);">${circuitoNome}</td>
+                        <td style="text-align: center; font-weight: bold; color: var(--m3-on-surface-variant);">${c.onu || '-'}</td>
                         <td style="font-family: var(--font-family-mono); font-weight: 600; color: var(--m3-on-surface);">${c.serial || 'N/A'}</td>
                         <td style="font-family: var(--font-family-mono);">${c.codigo || 'N/A'}</td>
                         <td style="text-align: center;">
@@ -602,7 +604,7 @@ window.Dashboard360Engine = {
     },
 
     openQuickViewModal: function(olt, placa, porta, circuito, total, up, down, energy) {
-        document.getElementById('quick-view-title').innerHTML = `<span class="material-symbols-rounded">info</span> ${olt} - ${placa}/${String(porta).padStart(2, '0')} - ${circuito}`;
+        document.getElementById('quick-view-title').innerHTML = `<span class="material-symbols-rounded">info</span> ${olt} - ${placa}/${porta} - ${circuito}`;
         document.getElementById('qv-total').textContent = total;
         document.getElementById('qv-up').textContent = up;
         document.getElementById('qv-down').textContent = down;
