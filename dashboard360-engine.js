@@ -55,6 +55,14 @@ window.Dashboard360Engine = {
             }
 
             const totalClients = up + down;
+            
+            let upPct = 0;
+            let downPct = 0;
+            if (totalClients > 0) {
+                upPct = Math.round((up / totalClients) * 100);
+                downPct = 100 - upPct;
+            }
+
             let lastUpdateStr = '--/--/---- --:--:--';
             
             if (window.OLT_LAST_UPDATES && window.OLT_LAST_UPDATES[olt.id]) {
@@ -104,6 +112,17 @@ window.Dashboard360Engine = {
                             <span class="material-symbols-rounded" style="font-size: 16px;">groups</span> Total OLT
                         </span>
                         <span style="font-family: var(--font-family-mono); font-weight: bold; font-size: 1.2rem; color: var(--m3-on-surface);">${totalClients}</span>
+                    </div>
+
+                    <div class="progress-container">
+                        <div class="progress-labels">
+                            <span class="text-success">${upPct}% ON</span>
+                            <span class="text-error">${downPct}% OFF</span>
+                        </div>
+                        <div class="progress-bar-wrapper">
+                            <div class="progress-bar-online" style="width: ${upPct}%;"></div>
+                            <div class="progress-bar-offline" style="width: ${downPct}%;"></div>
+                        </div>
                     </div>
 
                     <div class="card-body">
