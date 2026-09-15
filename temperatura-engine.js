@@ -8,7 +8,8 @@ const TAB_TEMPERATURA = 'TEMPERATURA';
 const MAPA_COLUNAS_TEMP = {
     'HEL-1': 0, 'HEL-2': 6, 'MGP': 12, 'PQA-1': 18, 'PSV-1': 24, 'PSV-7': 30, 
     'SBO-1': 36, 'SBO-2': 42, 'SBO-3': 48, 'SBO-4': 54, 'LTXV-1': 60, 
-    'LTXV-2': 66, 'PQA-2': 72, 'PQA-3': 78, 'SB-1': 84, 'SB-2': 90, 'SB-3': 96
+    'LTXV-2': 66, 'PQA-2': 72, 'PQA-3': 78, 'SB-1': 84, 'SB-2': 90, 'SB-3': 96,
+    'LTXV-3': 102
 };
 
 window.TEMP_DATA_STORE = {}; 
@@ -127,10 +128,15 @@ window.exportTemperaturaSlotToTXT = function() {
     }
     const slot = window.CURRENT_VIEW_SLOT || '?';
     
-    let txtContent = `=================================================\n`;
-    txtContent += `   RELATÓRIO TÉRMICO - ${oltName} (SLOT ${slot})\n`;
-    txtContent += `   Gerado em: ${new Date().toLocaleString('pt-BR')}\n`;
-    txtContent += `=================================================\n\n`;
+    let txtContent = `=================================================
+`;
+    txtContent += `   RELATÓRIO TÉRMICO - ${oltName} (SLOT ${slot})
+`;
+    txtContent += `   Gerado em: ${new Date().toLocaleString('pt-BR')}
+`;
+    txtContent += `=================================================
+
+`;
     
     const tbody = document.getElementById('temperatura-detalhes-tbody');
     const rows = tbody.querySelectorAll('tr');
@@ -148,11 +154,14 @@ window.exportTemperaturaSlotToTXT = function() {
             const limites = cols[2].innerText.trim();
             const status = cols[3].innerText.trim();
             
-            txtContent += `• Sensor ${sensor.padEnd(5, ' ')} | Temp: ${temp.padEnd(8, ' ')} | ${limites.padEnd(15, ' ')} | Status: ${status}\n`;
+            txtContent += `• Sensor ${sensor.padEnd(5, ' ')} | Temp: ${temp.padEnd(8, ' ')} | ${limites.padEnd(15, ' ')} | Status: ${status}
+`;
         }
     });
     
-    txtContent += `\n=================================================\n`;
+    txtContent += `
+=================================================
+`;
     
     const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');

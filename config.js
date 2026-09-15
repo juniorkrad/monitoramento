@@ -10,7 +10,7 @@ const POP_MAP = {
     'PSV-1': 'POP São Vicente', 'PSV-7': 'POP São Vicente',
     'SBO-1': 'POP São Bernardo', 'SBO-2': 'POP São Bernardo', 'SBO-3': 'POP São Bernardo', 'SBO-4': 'POP São Bernardo',
     'HEL-1': 'POP Heliópolis', 'HEL-2': 'POP Heliópolis',
-    'LTXV-1': 'POP Lote XV', 'LTXV-2': 'POP Lote XV',
+    'LTXV-1': 'POP Lote XV', 'LTXV-2': 'POP Lote XV', 'LTXV-3': 'POP Lote XV',
     'SB-1': 'POP São Bento', 'SB-2': 'POP São Bento', 'SB-3': 'POP São Bento',
     'PQA-1': 'POP Parque Amorim', 'PQA-2': 'POP Parque Amorim', 'PQA-3': 'POP Parque Amorim',
     'MGP': 'POP Piabetá'
@@ -24,6 +24,7 @@ const GLOBAL_MASTER_OLT_LIST = [
     { id: 'MGP',    sheetTab: 'MGP',   type: 'nokia',       boards: 8,  circuitCol: 5,  energyCol: 16 },
     { id: 'LTXV-1', sheetTab: 'LTXV1', type: 'furukawa-10', boards: 10, circuitCol: 31, energyCol: 20 }, 
     { id: 'LTXV-2', sheetTab: 'LTXV2', type: 'furukawa-2',  boards: 2,  circuitCol: 29, energyCol: 28 },
+    { id: 'LTXV-3', sheetTab: 'LTXV3', type: 'nokia',       boards: 8,  circuitCol: 35, energyCol: 68 },
     { id: 'PQA-2',  sheetTab: 'PQA2',  type: 'furukawa-2',  boards: 2,  circuitCol: 25, energyCol: 32 },
     { id: 'PQA-3',  sheetTab: 'PQA3',  type: 'furukawa-2',  boards: 2,  circuitCol: 27, energyCol: 36 },
     { id: 'SB-1',   sheetTab: 'SB1',   type: 'furukawa-2',  boards: 2,  circuitCol: 19, energyCol: 40 },

@@ -1,6 +1,5 @@
 // ==============================================================================
 // data-mapper.js - O "Cérebro" de Tratamento e Cruzamento de Dados
-// Responsável por padronizar portas, status, potências e cruzar dados.
 // ==============================================================================
 
 const DataMapper = {
@@ -10,7 +9,7 @@ const DataMapper = {
         'HEL1': 1,  'HEL2': 3,  'MGP': 5,   'PQA1': 7,  'PSV1': 9,  
         'PSV7': 11, 'SBO2': 13, 'SBO3': 15, 'SBO4': 17, 'SB1': 19,  
         'SB2': 21,  'SB3': 23,  'PQA2': 25, 'PQA3': 27, 'LTXV2': 29,
-        'LTXV1': 31, 'SBO1': 33  
+        'LTXV1': 31, 'SBO1': 33, 'LTXV3': 35
     },
 
     // 2. Extrator Inteligente de Porta e Placa

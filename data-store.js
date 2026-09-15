@@ -18,10 +18,11 @@ async function fetchAllNetworkData() {
         const ranges = GLOBAL_MASTER_OLT_LIST.map(o => `${o.sheetTab}!A:K`);
         
         // 2. Adiciona as abas de apoio, temperatura e energia no mesmo pacote
+        // Limites estendidos para englobar LTXV3 (AJ, AK, BT e DD)
         ranges.push('CIRCUITO!A:AK');
-        ranges.push('LOCALIDADE!A:AH');
-        ranges.push('TEMPERATURA!A:CX');
-        ranges.push('ENERGIA!A:BP');
+        ranges.push('LOCALIDADE!A:AK');
+        ranges.push('TEMPERATURA!A:DD');
+        ranges.push('ENERGIA!A:BT');
 
         // 3. Dispara UMA única requisição para a API do Google Sheets
         const dataBatch = await API.getBatch(ranges);

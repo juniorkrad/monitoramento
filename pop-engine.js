@@ -2,15 +2,31 @@
 // pop-engine.js - Controlador Exclusivo da Página de Visão Geral de POPs
 // ==============================================================================
 
-const POP_MAP_CONFIG = [
-    { name: 'POP São Vicente', olts: ['PSV-1', 'PSV-7'] },
-    { name: 'POP Heliópolis', olts: ['HEL-1', 'HEL-2'] },
-    { name: 'POP Lote XV', olts: ['LTXV-1', 'LTXV-2'] },
-    { name: 'POP Piabetá', olts: ['MGP'] },
-    { name: 'POP Parque Amorim', olts: ['PQA-1', 'PQA-2', 'PQA-3'] },
-    { name: 'POP São Bento', olts: ['SB-1', 'SB-2', 'SB-3'] },
-    { name: 'POP São Bernardo', olts: ['SBO-1', 'SBO-2', 'SBO-3', 'SBO-4'] }
-];
+let DYNAMIC_POP_MAP = [];
+
+function buildDynamicPopMap() {
+    const popGroups = {};
+    if (typeof POP_MAP === 'undefined' || typeof GLOBAL_MASTER_OLT_LIST === 'undefined') {
+        console.error("[POP Engine] Configurações globais não encontradas!");
+        return;
+    }
+
+    GLOBAL_MASTER_OLT_LIST.forEach(olt => {
+        const popName = POP_MAP[olt.id];
+        if (popName) {
+            if (!popGroups[popName]) {
+                popGroups[popName] = [];
+            }
+            popGroups[popName].push(olt.id);
+        }
+    });
+
+    DYNAMIC_POP_MAP = Object.keys(popGroups).map(name => {
+        return { name: name, olts: popGroups[name] };
+    });
+    
+    DYNAMIC_POP_MAP.sort((a, b) => a.name.localeCompare(b.name));
+}
 
 window.triggerRelatorio = function(popName, funcName, event) {
     if (event) event.stopPropagation();
@@ -37,7 +53,7 @@ function createPopCards() {
     if (!grid) return;
     grid.innerHTML = ''; 
 
-    POP_MAP_CONFIG.forEach(pop => {
+    DYNAMIC_POP_MAP.forEach(pop => {
         const safeId = pop.name.replace(/[^a-zA-Z0-9]/g, '');
         
         grid.innerHTML += `
@@ -73,7 +89,6 @@ function createPopCards() {
                             <span class="material-symbols-rounded" style="color: var(--m3-color-error); font-size: 20px;">warning</span> Alarmes
                         </button>
                         
-                        <!-- BOTÃO SUBSTITUÍDO: Relatório Híbrido -->
                         <button style="font-family: inherit; font-weight: 500; background-color: var(--m3-surface-container-highest); color: var(--m3-on-surface); border: 1px solid var(--m3-outline); padding: 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem; transition: background 0.2s;" onclick="triggerRelatorio('${pop.name}', 'gerarRelatorioHibridoOffscreen', event)" onmouseover="this.style.backgroundColor='var(--m3-state-layer-hover)'" onmouseout="this.style.backgroundColor='var(--m3-surface-container-highest)'">
                             <span class="material-symbols-rounded" style="color: var(--m3-primary); font-size: 20px;">analytics</span> Rel. Híbrido
                         </button>
@@ -97,7 +112,7 @@ function createPopCards() {
 function updatePopData() {
     if (!window.DATA_STORE || !window.DATA_STORE.isReady) return;
 
-    POP_MAP_CONFIG.forEach(pop => {
+    DYNAMIC_POP_MAP.forEach(pop => {
         let popOnline = 0;
         let popOffline = 0;
         let popSemEnergia = 0;
@@ -147,7 +162,7 @@ function updatePopData() {
 }
 
 window.openPopModal = function(popName) {
-    const pop = POP_MAP_CONFIG.find(p => p.name === popName);
+    const pop = DYNAMIC_POP_MAP.find(p => p.name === popName);
     if (!pop) return;
 
     document.getElementById('pop-modal-title').innerHTML = `<span class="material-symbols-rounded">domain</span> Detalhes: ${popName}`;
@@ -252,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof loadFooter === 'function') loadFooter();
     if (typeof updateGlobalTimestamp === 'function') updateGlobalTimestamp();
     
+    buildDynamicPopMap();
     createPopCards();
 });
 

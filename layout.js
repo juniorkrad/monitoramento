@@ -142,28 +142,6 @@ function loadSidebar(currentPage) {
                     POPS
                 </a>
 
-                <!-- BLOCO TEMPORARIAMENTE OCULTO (TESTE DASHBOARD 360)
-                <a href="olt.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
-                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">dns</span>
-                    STATUS OLTS
-                </a>
-                
-                <a href="energia.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
-                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">bolt</span>
-                    ENERGIA
-                </a>
-
-                <a href="potencia.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
-                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">sensors</span>
-                    POTÊNCIA
-                </a>
-
-                <a href="temperatura.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
-                    <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">device_thermostat</span>
-                    TEMPERATURA
-                </a>
-                FIM BLOCO OCULTO -->
-
                 <a href="equipamentos.html" class="sidebar-link home-highlight" style="margin-top: 5px; font-size: 1rem; padding: 12px 12px 12px 20px; justify-content: flex-start; text-align: left;">
                     <span class="material-symbols-rounded" style="font-size: 24px; margin-right: 12px;">router</span>
                     EQUIPAMENTOS
@@ -714,7 +692,8 @@ const OLT_EMERGENCY_MAP = {
     'PQA-3': { row: 15, timeSecs: 180 }, 
     'SB-1':  { row: 16, timeSecs: 180 }, 
     'SB-2':  { row: 17, timeSecs: 180 }, 
-    'SB-3':  { row: 18, timeSecs: 180 }
+    'SB-3':  { row: 18, timeSecs: 180 },
+    'LTXV-3':{ row: 19, timeSecs: 180 }
 };
 
 let emergencyInterval = null;
